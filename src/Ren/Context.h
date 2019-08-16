@@ -11,6 +11,7 @@
 #include "TextureRegion.h"
 
 struct SWcontext;
+struct VkContext;
 
 namespace Ren {
 const int
@@ -30,13 +31,15 @@ protected:
     AnimSeqStorage          anims_;
     BufferStorage           buffers_;
 
+    TextureAtlasArray       texture_atlas_;
+
     BufferRef               default_vertex_buf1_, default_vertex_buf2_, default_skin_vertex_buf_,
                             default_indices_buf_;
 
-    TextureAtlasArray       texture_atlas_;
-
-#if defined(USE_SW_RENDER)
-    SWcontext       *sw_ctx_;
+#if defined(USE_VK_RENDER)
+    std::unique_ptr<VkContext>  vk_ctx_;
+#elif defined(USE_SW_RENDER)
+    SWcontext                   *sw_ctx_;
 #endif
 
 #if defined(USE_GL_RENDER)
@@ -47,12 +50,8 @@ public:
 
     void Init(int w, int h);
 
-    int w() const {
-        return w_;
-    }
-    int h() const {
-        return h_;
-    }
+    int w() const { return w_; }
+    int h() const { return h_; }
 
     BufferRef default_vertex_buf1() const { return default_vertex_buf1_; }
     BufferRef default_vertex_buf2() const { return default_vertex_buf2_; }

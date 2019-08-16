@@ -3,7 +3,11 @@ extern "C" {
 #include "SW/_SW.c"
 }
 
-#if defined(USE_GL_RENDER)
+#if defined(USE_VK_RENDER)
+#include "VKExt.cpp"
+#include "ContextVK.cpp"
+#include "ProgramVK.cpp"
+#elif defined(USE_GL_RENDER)
 #include "GLExt.cpp"
 #include "ContextGL.cpp"
 #include "ProgramGL.cpp"
@@ -14,6 +18,7 @@ extern "C" {
 #include "TextureSW.cpp"
 #endif
 
+#if !defined(USE_VK_RENDER)
 #include "Anim.cpp"
 #include "Buffer.cpp"
 #include "Camera.cpp"
@@ -25,3 +30,4 @@ extern "C" {
 #include "TextureRegion.cpp"
 #include "TextureSplitter.cpp"
 #include "Utils.cpp"
+#endif

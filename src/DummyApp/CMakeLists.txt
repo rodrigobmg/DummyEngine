@@ -70,8 +70,8 @@ endif()
 
 target_link_libraries(DummyApp DummyLib ${LIBS})
 
-add_custom_command(TARGET DummyApp 
+add_custom_command(TARGET DummyApp
                    POST_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:DummyApp> ${WORKING_DIRECTORY})
                    
-set_target_properties(DummyApp PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${WORKING_DIRECTORY}")
+set_target_properties(DummyApp PROPERTIES OUTPUT_NAME ${BIN_NAME} VS_DEBUGGER_WORKING_DIRECTORY "${WORKING_DIRECTORY}")

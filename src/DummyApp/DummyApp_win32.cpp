@@ -230,6 +230,8 @@ int DummyApp::Init(int w, int h) {
 
     device_context_ = GetDC(window_handle_);
 
+#if defined(USE_VK_RENDER)
+#elif defined(USE_GL_RENDER)
     const int pixel_attribs[] = {
         WGL_DRAW_TO_WINDOW_ARB, GL_TRUE,
         WGL_SUPPORT_OPENGL_ARB, GL_TRUE,
@@ -281,6 +283,7 @@ int DummyApp::Init(int w, int h) {
         LOGE("wglMakeCurrent() failed");
         return -1;
     }
+#endif
 
     try {
         Viewer::PrepareAssets("pc");

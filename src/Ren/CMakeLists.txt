@@ -81,13 +81,20 @@ elseif(${RENDERER} STREQUAL "SW")
                      TextureSW.h
                      TextureSW.cpp)
 elseif(${RENDERER} STREQUAL "VK")
-    set(SOURCE_FILES    ${SOURCE_FILES}
-                        RenderStateVK.cpp
-                        RenderStateVK.h)
+    set(SOURCE_FILES ${SOURCE_FILES}
+                     ContextVK.cpp
+                     VK.h
+                     VKExt.cpp
+                     ProgramVK.h
+                     ProgramVK.cpp
+                     TextureVK.h
+                     TextureVK.cpp)
 endif()
 
 add_subdirectory(SW)
 add_subdirectory(SOIL2)
+
+include_directories(vulkan)
 
 list(APPEND ALL_SOURCE_FILES ${SOURCE_FILES})
 set_source_files_properties(${SOURCE_FILES} PROPERTIES HEADER_FILE_ONLY TRUE)
