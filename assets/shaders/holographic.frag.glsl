@@ -22,9 +22,6 @@ layout(binding = $ItemsBufSlot) uniform highp usamplerBuffer items_buffer;
 layout(binding = $Moments0TexSlot) uniform mediump sampler2D moments0_texture;
 layout(binding = $Moments1TexSlot) uniform mediump sampler2D moments1_texture;
 layout(binding = $Moments2TexSlot) uniform mediump sampler2D moments2_texture;
-layout(binding = $Moments0MsTexSlot) uniform mediump sampler2DMS moments0_texture_ms;
-layout(binding = $Moments1MsTexSlot) uniform mediump sampler2DMS moments1_texture_ms;
-layout(binding = $Moments2MsTexSlot) uniform mediump sampler2DMS moments2_texture_ms;
 
 struct ShadowMapRegion {
     vec4 transform;
@@ -123,22 +120,12 @@ void main(void) {
         } else if (floatBitsToInt(uTranspDepthRangeAndMode[2]) == 1) {
             outColor = vec4(diffuse_color, alpha) * TransparentDepthWeight(gl_FragCoord.z, alpha);
             outNormal = vec4(alpha);
-        } else {
-            float b_0;
-            vec4 b_1234;
-                               
-            if (floatBitsToInt(uTranspDepthRangeAndMode[2]) == 3) {
-                b_0 = texelFetch(moments0_texture, ivec2(ix, iy), 0).x;
-                b_1234 = vec4(texelFetch(moments1_texture, ivec2(ix, iy), 0).xy,
-                              texelFetch(moments2_texture, ivec2(ix, iy), 0).xy);
-            } else {
-                b_0 = texelFetch(moments0_texture_ms, ivec2(ix, iy), 0).x;
-                b_1234 = vec4(texelFetch(moments1_texture_ms, ivec2(ix, iy), 0).xy,
-                              texelFetch(moments2_texture_ms, ivec2(ix, iy), 0).xy);
-            }
+        } else {            
+            highp float b_0 = texelFetch(moments0_texture, ivec2(ix, iy), 0).x;
+            vec4 b_1234 = vec4(texelFetch(moments1_texture, ivec2(ix, iy), 0).xy,
+                               texelFetch(moments2_texture, ivec2(ix, iy), 0).xy);
            
-            float transmittance_at_depth;
-            float total_transmittance;
+            float transmittance_at_depth, total_transmittance;
             ResolveMoments(transp_z, b_0, b_1234, transmittance_at_depth, total_transmittance);
         
             outColor = vec4(alpha * transmittance_at_depth * diffuse_color, alpha * transmittance_at_depth);

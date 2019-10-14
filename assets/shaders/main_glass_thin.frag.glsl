@@ -19,12 +19,9 @@ layout(binding = $LightBufSlot) uniform mediump samplerBuffer lights_buffer;
 layout(binding = $DecalBufSlot) uniform mediump samplerBuffer decals_buffer;
 layout(binding = $CellsBufSlot) uniform highp usamplerBuffer cells_buffer;
 layout(binding = $ItemsBufSlot) uniform highp usamplerBuffer items_buffer;
-layout(binding = $Moments0TexSlot) uniform mediump sampler2D moments0_texture;
+layout(binding = $Moments0TexSlot) uniform highp sampler2D moments0_texture;
 layout(binding = $Moments1TexSlot) uniform mediump sampler2D moments1_texture;
 layout(binding = $Moments2TexSlot) uniform mediump sampler2D moments2_texture;
-layout(binding = $Moments0MsTexSlot) uniform mediump sampler2DMS moments0_texture_ms;
-layout(binding = $Moments1MsTexSlot) uniform mediump sampler2DMS moments1_texture_ms;
-layout(binding = $Moments2MsTexSlot) uniform mediump sampler2DMS moments2_texture_ms;
 
 struct ShadowMapRegion {
     vec4 transform;
@@ -85,13 +82,14 @@ void main(void) {
     const float R0 = 0.15f;
     float factor = pow5(clamp(1.0 - dot(normal, -view_ray_ws), 0.0, 1.0));
     float fresnel = clamp(R0 + (1.0 - R0) * factor, 0.0, 1.0);
+    float alpha = fresnel;
     
     if (floatBitsToInt(uTranspDepthRangeAndMode[2]) != 2) {
         highp float k = log2(lin_depth / uClipInfo[1]) / uClipInfo[3];
         int slice = int(floor(k * $ItemGridResZ.0));
         
-        int ix = int(gl_FragCoord.x), iy = int(gl_FragCoord.y);
-        int cell_index = slice * $ItemGridResX * $ItemGridResY + (iy * $ItemGridResY / int(uResAndFRes.y)) * $ItemGridResX + ix * $ItemGridResX / int(uResAndFRes.x);
+        ivec2 icoord = ivec2(gl_FragCoord.xy);
+        int cell_index = slice * $ItemGridResX * $ItemGridResY + (icoord.y * $ItemGridResY / int(uResAndFRes.y)) * $ItemGridResX + icoord.x * $ItemGridResX / int(uResAndFRes.x);
         
         highp uvec2 cell_data = texelFetch(cells_buffer, cell_index).xy;
         highp uint offset = bitfieldExtract(cell_data.x, 0, 24);
@@ -119,34 +117,24 @@ void main(void) {
         }
         
         if (floatBitsToInt(uTranspDepthRangeAndMode[2]) == 0) {
-            outColor = vec4(reflected_color * specular_color.rgb, fresnel);
+            outColor = vec4(reflected_color * specular_color.rgb, alpha);
         } else if (floatBitsToInt(uTranspDepthRangeAndMode[2]) == 1) {
-            outColor = vec4(reflected_color * specular_color.rgb, fresnel) * TransparentDepthWeight(gl_FragCoord.z, fresnel);
-            outNormal = vec4(fresnel);
+            outColor = vec4(reflected_color * specular_color.rgb, alpha) * TransparentDepthWeight(gl_FragCoord.z, alpha);
+            outNormal = vec4(alpha);
         } else {
-            float b_0;
-            vec4 b_1234;
-                               
-            if (floatBitsToInt(uTranspDepthRangeAndMode[2]) == 3) {
-                b_0 = texelFetch(moments0_texture, ivec2(ix, iy), 0).x;
-                b_1234 = vec4(texelFetch(moments1_texture, ivec2(ix, iy), 0).xy,
-                              texelFetch(moments2_texture, ivec2(ix, iy), 0).xy);
-            } else {
-                b_0 = texelFetch(moments0_texture_ms, ivec2(ix, iy), 0).x;
-                b_1234 = vec4(texelFetch(moments1_texture_ms, ivec2(ix, iy), 0).xy,
-                              texelFetch(moments2_texture_ms, ivec2(ix, iy), 0).xy);
-            }
+            highp float b_0 = texelFetch(moments0_texture, icoord, 0).x;
+            vec4 b_1234 = vec4(texelFetch(moments1_texture, icoord, 0).xy,
+                               texelFetch(moments2_texture, icoord, 0).xy);
             
-            float transmittance_at_depth;
-            float total_transmittance;
+            float transmittance_at_depth, total_transmittance;
             ResolveMoments(transp_z, b_0, b_1234, transmittance_at_depth, total_transmittance);
             
-            outColor = vec4(fresnel * transmittance_at_depth * reflected_color * specular_color.rgb, fresnel * transmittance_at_depth);
+            outColor = vec4(alpha * transmittance_at_depth * reflected_color * specular_color.rgb, alpha * transmittance_at_depth);
         }
     } else {
         float b_0;
         vec4 b_1234;
-        GenerateMoments(transp_z, 1.0 - fresnel, b_0, b_1234);
+        GenerateMoments(transp_z, 1.0 - alpha, b_0, b_1234);
         
         outColor.x = b_0;
         outNormal.xy = b_1234.xy;

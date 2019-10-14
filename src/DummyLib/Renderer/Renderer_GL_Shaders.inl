@@ -228,6 +228,10 @@ static const char blit_transparent_init_fs[] =
 #include "Shaders/blit_transparent_init.frag.glsl"
 ;
 
+static const char blit_resolve_depth_fs[] =
+#include "Shaders/blit_resolve_depth.frag.glsl"
+;
+
 static const char probe_vs[] =
 #include "Shaders/probe.vert.glsl"
 ;

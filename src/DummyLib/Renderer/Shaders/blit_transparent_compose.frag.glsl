@@ -14,13 +14,15 @@ R"(#version 310 es
 
 #define REN_OIT_MODE )" AS_STR(REN_OIT_MODE) R"(
 
+layout(binding = )" AS_STR(REN_BASE0_TEX_SLOT) R"() uniform mediump
 #if defined(MSAA_4)
-layout(binding = )" AS_STR(REN_BASE0_TEX_SLOT) R"() uniform mediump sampler2DMS s_accum_texture;
-layout(binding = )" AS_STR(REN_BASE1_TEX_SLOT) R"() uniform mediump sampler2DMS s_additional_texture;
+    sampler2DMS
 #else
-layout(binding = )" AS_STR(REN_BASE0_TEX_SLOT) R"() uniform mediump sampler2D s_accum_texture;
-layout(binding = )" AS_STR(REN_BASE1_TEX_SLOT) R"() uniform mediump sampler2D s_additional_texture;
+    sampler2D
 #endif
+    s_accum_texture;
+
+layout(binding = )" AS_STR(REN_BASE1_TEX_SLOT) R"() uniform mediump sampler2D s_additional_texture;
 
 in vec2 aVertexUVs_;
 
@@ -42,9 +44,7 @@ void main() {
     float b0 = texelFetch(s_additional_texture, icoord, 0).x;
 
 #if REN_OIT_MOMENT_RENORMALIZE
-    if (accum.w > 0.0000001) {
-        accum.xyz /= accum.w;
-    }
+    accum.xyz /= clamp(accum.w, 1e-5, 5e4);
 #endif
 
     float k = exp(-b0);

@@ -32,9 +32,6 @@
 #define REN_MOMENTS0_TEX_SLOT 4 // replaces lightmap slot 0
 #define REN_MOMENTS1_TEX_SLOT 5 // replaces lightmap slot 1
 #define REN_MOMENTS2_TEX_SLOT 6 // replaces lightmap slot 2
-#define REN_MOMENTS0_MS_TEX_SLOT 7 // replaces lightmap slot 3
-#define REN_MOMENTS1_MS_TEX_SLOT 9 // replaces ssao slot
-#define REN_MOMENTS2_MS_TEX_SLOT 17
 
 #define REN_ALPHATEST_TEX_SLOT 0
 
@@ -105,5 +102,5 @@
 
 #define REN_OIT_MOMENT_RENORMALIZE  1
 
-#define REN_OIT_MODE REN_OIT_DISABLED
+#define REN_OIT_MODE 2
 

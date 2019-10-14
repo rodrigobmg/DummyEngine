@@ -91,6 +91,7 @@ set(SHADERS_SOURCES Renderer/Shaders/blit.frag.glsl
 					Renderer/Shaders/blit_prefilter.frag.glsl
                     Renderer/Shaders/blit_project_sh.frag.glsl
                     Renderer/Shaders/blit_reduced.frag.glsl
+                    Renderer/Shaders/blit_resolve_depth.frag.glsl
                     Renderer/Shaders/blit_rgbm.frag.glsl
                     Renderer/Shaders/blit_ssao.frag.glsl
                     Renderer/Shaders/blit_ssr.frag.glsl

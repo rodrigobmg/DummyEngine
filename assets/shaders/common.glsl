@@ -167,7 +167,9 @@ vec3 EvaluateSH(in vec3 normal, in vec4 sh_coeffs[3]) {
 }
 
 void GenerateMoments(float depth, float transmittance, out float b_0, out vec4 b) {
-    float absorbance = -log(transmittance);
+    if (0.9999999 - transmittance < 0.0) discard;
+
+    float absorbance = clamp(-log(transmittance), 0.0, 6.0);
 
     float depth_pow2 = depth * depth;
     float depth_pow4 = depth_pow2 * depth_pow2;
@@ -247,4 +249,5 @@ void ResolveMoments(float depth, float b0, vec4 b_1234, out float transmittance_
 float TransparentDepthWeight(float z, float alpha) {
     //return alpha * clamp(0.1 * (1e-5 + 0.04 * z * z + pow6(0.005 * z)), 1e-2, 3e3);
     return alpha * max(3e3 * pow3(1.0 - z), 1e-2);
+    //return alpha;
 }

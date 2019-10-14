@@ -243,6 +243,9 @@ void Renderer::InitRendererInternal() {
     LOGI("Compiling blit_transparent_init_prog");
     blit_transparent_init_prog_ = ctx_.LoadProgramGLSL("blit_transparent_init_prog", blit_vs, blit_transparent_init_fs, &status);
     assert(status == Ren::ProgCreatedFromData);
+    LOGI("Compiling blit_resolve_depth_prog");
+    blit_resolve_depth_prog_ = ctx_.LoadProgramGLSL("blit_resolve_depth_prog", blit_vs, blit_resolve_depth_fs, &status);
+    assert(status == Ren::ProgCreatedFromData);
     LOGI("Compiling probe_prog");
     probe_prog_ = ctx_.LoadProgramGLSL("probe_prog", probe_vs, probe_fs, &status);
     assert(status == Ren::ProgCreatedFromData);
@@ -690,29 +693,26 @@ bool Renderer::InitFramebuffersInternal() {
     }
 
 #if (REN_OIT_MODE == REN_OIT_MOMENT_BASED)
-    {   // Attach depth from clean buffer to moments buffer
-        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)moments_buf_.fb);
+    if (clean_buf_.sample_count == 1) {
+        {   // Attach depth from clean buffer to transparent buffer
+            glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)resolved_or_transparent_buf_.fb);
 
-        GLuint depth_tex = (GLuint)clean_buf_.depth_tex.GetValue();
-        if (clean_buf_.sample_count > 1) {
-            assert(moments_buf_.sample_count == clean_buf_.sample_count);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D_MULTISAMPLE, depth_tex, 0);
-        } else {
+            GLuint depth_tex = (GLuint)clean_buf_.depth_tex.GetValue();
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_tex, 0);
+
+            GLenum s = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            result = (s == GL_FRAMEBUFFER_COMPLETE);
         }
 
-        GLenum s = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-        result = (s == GL_FRAMEBUFFER_COMPLETE);
-    }
-    if (clean_buf_.sample_count == 1) {
-        // Attach depth from clean buffer to transparent buffer
-        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)resolved_or_transparent_buf_.fb);
+        {   // Attach depth from clean buffer to moments buffer
+            glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)moments_buf_.fb);
 
-        GLuint depth_tex = (GLuint)clean_buf_.depth_tex.GetValue();
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_tex, 0);
+            GLuint depth_tex = (GLuint)clean_buf_.depth_tex.GetValue();
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_tex, 0);
 
-        GLenum s = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-        result = (s == GL_FRAMEBUFFER_COMPLETE);
+            GLenum s = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            result = (s == GL_FRAMEBUFFER_COMPLETE);
+        }
     }
 #endif
 
@@ -1834,6 +1834,24 @@ void Renderer::DrawObjectsInternal(const DrawList &list, const FrameBuf *target)
         glBindFramebuffer(GL_FRAMEBUFFER, moments_buf_.fb);
         glClear(GL_COLOR_BUFFER_BIT);
 
+        if (clean_buf_.sample_count > 1) {
+            DebugMarker _("RESOLVE MS DEPTH");
+
+            glDepthFunc(GL_ALWAYS);
+            glDepthMask(GL_TRUE);
+
+            glBindVertexArray((GLuint)fs_quad_vao_);
+
+            glUseProgram(blit_resolve_depth_prog_->prog_id());
+            glUniform4f(0, 0.0f, 0.0f, float(act_w_), float(act_h_));
+
+            BindTextureMs(REN_BASE0_TEX_SLOT, clean_buf_.depth_tex.GetValue());
+
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (const GLvoid *)uintptr_t(quad_ndx_offset_));
+
+            glBindVertexArray((GLuint)draw_pass_vao_);
+        }
+
         glEnable(GL_BLEND);
         glBlendFunc(GL_ONE, GL_ONE);
 
@@ -1876,7 +1894,7 @@ void Renderer::DrawObjectsInternal(const DrawList &list, const FrameBuf *target)
 
         {   // Change transparency draw mode
             glBindBuffer(GL_UNIFORM_BUFFER, (GLuint)unif_shared_data_block_[cur_buf_chunk_]);
-            const int transp_mode = clean_buf_.sample_count > 1 ? 4 : 3;
+            const int transp_mode = 3;
             glBufferSubData(GL_UNIFORM_BUFFER, offsetof(SharedDataBlock, uTranspDepthRangeAndMode) + 2 * sizeof(float), sizeof(float), &transp_mode);
         }
 
@@ -1884,19 +1902,12 @@ void Renderer::DrawObjectsInternal(const DrawList &list, const FrameBuf *target)
             (clean_buf_.sample_count > 1) ? clean_buf_color_only_ : resolved_or_transparent_buf_.fb;
 
         glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)target_framebuf);
-        
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        if (moments_buf_.sample_count > 1) {
-            BindTextureMs(REN_MOMENTS0_MS_TEX_SLOT, moments_buf_.attachments[0].tex);
-            BindTextureMs(REN_MOMENTS1_MS_TEX_SLOT, moments_buf_.attachments[1].tex);
-            BindTextureMs(REN_MOMENTS2_MS_TEX_SLOT, moments_buf_.attachments[2].tex);
-        } else {
-            BindTexture(REN_MOMENTS0_TEX_SLOT, moments_buf_.attachments[0].tex);
-            BindTexture(REN_MOMENTS1_TEX_SLOT, moments_buf_.attachments[1].tex);
-            BindTexture(REN_MOMENTS2_TEX_SLOT, moments_buf_.attachments[2].tex);
-        }
+        BindTexture(REN_MOMENTS0_TEX_SLOT, moments_buf_.attachments[0].tex);
+        BindTexture(REN_MOMENTS1_TEX_SLOT, moments_buf_.attachments[1].tex);
+        BindTexture(REN_MOMENTS2_TEX_SLOT, moments_buf_.attachments[2].tex);
 
         {   // Draw alpha-blended surfaces
             DebugMarker _("TRANSPARENT PASS");
@@ -1936,10 +1947,14 @@ void Renderer::DrawObjectsInternal(const DrawList &list, const FrameBuf *target)
 
         glBindFramebuffer(GL_FRAMEBUFFER, clean_buf_.fb);
 #elif (REN_OIT_MODE == REN_OIT_WEIGHTED_BLENDED)
-        glBindFramebuffer(GL_FRAMEBUFFER, clean_buf_transparent_);
+        const uint32_t target_buffer =
+            (clean_buf_.sample_count > 1) ? clean_buf_transparent_
+                                          : resolved_or_transparent_buf_.fb;
+
+        glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)target_buffer);
 
         {   DebugMarker _("INIT TRANSPARENT BUF");
-
+#if 1       
             glBindVertexArray((GLuint)fs_quad_vao_);
             
             glDisable(GL_DEPTH_TEST);
@@ -1948,6 +1963,12 @@ void Renderer::DrawObjectsInternal(const DrawList &list, const FrameBuf *target)
             glUniform4f(0, 0.0f, 0.0f, float(act_w_), float(act_h_));
 
             glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (const GLvoid *)uintptr_t(quad_ndx_offset_));
+#else   // which is faster?
+            const float zero[] = { 0.0f, 0.0f, 0.0f, 0.0f };
+            glClearBufferfv(GL_COLOR, 0, zero);
+            const float one[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            glClearBufferfv(GL_COLOR, 1, one);
+#endif
         }
 
         {   DebugMarker _("TRANSPARENT PASS");
@@ -2200,19 +2221,19 @@ void Renderer::DrawObjectsInternal(const DrawList &list, const FrameBuf *target)
 
         if (clean_buf_.sample_count > 1) {
             BindTextureMs(REN_BASE0_TEX_SLOT, clean_buf_.attachments[REN_OUT_COLOR_INDEX].tex);
-#if REN_OIT_MODE == REN_OIT_MOMENT_BASED
-            BindTextureMs(REN_BASE1_TEX_SLOT, moments_buf_.attachments[0].tex);
-#elif REN_OIT_MODE == REN_OIT_WEIGHTED_BLENDED
-            BindTextureMs(REN_BASE1_TEX_SLOT, clean_buf_.attachments[REN_OUT_NORM_INDEX].tex);
-#endif
         } else {
             BindTexture(REN_BASE0_TEX_SLOT, resolved_or_transparent_buf_.attachments[0].tex);
-#if REN_OIT_MODE == REN_OIT_MOMENT_BASED
-            BindTexture(REN_BASE1_TEX_SLOT, moments_buf_.attachments[0].tex);
-#elif REN_OIT_MODE == REN_OIT_WEIGHTED_BLENDED
-            BindTexture(REN_BASE1_TEX_SLOT, clean_buf_.attachments[REN_OUT_NORM_INDEX].tex);
-#endif
         }
+
+#if REN_OIT_MODE == REN_OIT_MOMENT_BASED
+        BindTexture(REN_BASE1_TEX_SLOT, moments_buf_.attachments[0].tex);
+#elif REN_OIT_MODE == REN_OIT_WEIGHTED_BLENDED
+        if (clean_buf_.sample_count > 1) {
+            BindTextureMs(REN_BASE1_TEX_SLOT, clean_buf_.attachments[REN_OUT_NORM_INDEX].tex);
+        } else {
+
+        }
+#endif
 
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (const GLvoid *)uintptr_t(quad_ndx_offset_));
 

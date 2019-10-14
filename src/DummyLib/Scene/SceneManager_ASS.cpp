@@ -383,8 +383,8 @@ std::vector<Ray::pixel_color_t> FlushSeams(const Ray::pixel_color_t *pixels, int
                     Ray::pixel_color_t new_p = { 0 };
                     int count = 0;
 
-                    int _ys[] = { y - 1, y, y + 1 },
-                        _xs[] = { x - 1, x, x + 1 };
+                    const int _ys[] = { y - 1, y, y + 1 },
+                              _xs[] = { x - 1, x, x + 1 };
                     for (int _y : _ys) {
                         if (_y < 0 || _y > height - 1) continue;
 
@@ -404,7 +404,7 @@ std::vector<Ray::pixel_color_t> FlushSeams(const Ray::pixel_color_t *pixels, int
                     }
 
                     if (count) {
-                        float inv_c = 1.0f / count;
+                        const float inv_c = 1.0f / count;
                         new_p.r *= inv_c;
                         new_p.g *= inv_c;
                         new_p.b *= inv_c;
@@ -507,7 +507,7 @@ void ReadAllFiles_MT_r(const char *in_folder, const std::function<void(const cha
 }
 
 bool CheckCanSkipAsset(const char *in_file, const char *out_file) {
-#if !defined(NDEBUG) && 0
+#if !defined(NDEBUG) && 1
     if (strstr(in_file, ".glsl")) return false;
 #endif
 
@@ -669,9 +669,6 @@ bool SceneManager::PrepareAssets(const char *in_folder, const char *out_folder, 
     shader_constants.emplace("$Moments0TexSlot", AS_STR(REN_MOMENTS0_TEX_SLOT));
     shader_constants.emplace("$Moments1TexSlot", AS_STR(REN_MOMENTS1_TEX_SLOT));
     shader_constants.emplace("$Moments2TexSlot", AS_STR(REN_MOMENTS2_TEX_SLOT));
-    shader_constants.emplace("$Moments0MsTexSlot", AS_STR(REN_MOMENTS0_MS_TEX_SLOT));
-    shader_constants.emplace("$Moments1MsTexSlot", AS_STR(REN_MOMENTS1_MS_TEX_SLOT));
-    shader_constants.emplace("$Moments2MsTexSlot", AS_STR(REN_MOMENTS2_MS_TEX_SLOT));
 
     // Uniform locations
     shader_constants.emplace("$uMMatrixLoc",    AS_STR(REN_U_M_MATRIX_LOC));
