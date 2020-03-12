@@ -182,6 +182,27 @@ Renderer::Renderer(Ren::Context &ctx, std::shared_ptr<Sys::ThreadPool> threads)
         SceneManagerInternal::WriteImage(&img_data[0], res, res, 4, "assets/textures/skin_diffusion.uncompressed.png");*/
     }
 
+    {
+        const int res = 128;
+
+        // taken from old GPU-Gems article
+        const float gauss_variances[] = {
+            0.0064f, 0.0484f, 0.187f, 0.567f, 1.99f, 7.41f
+        };
+
+        const Ren::Vec3f diffusion_weights[] = {
+            Ren::Vec3f{ 0.233f, 0.455f, 0.649f },
+            Ren::Vec3f{ 0.100f, 0.336f, 0.344f },
+            Ren::Vec3f{ 0.118f, 0.198f, 0.0f },
+            Ren::Vec3f{ 0.113f, 0.007f, 0.007f },
+            Ren::Vec3f{ 0.358f, 0.004f, 0.0f },
+            Ren::Vec3f{ 0.078f, 0.0f, 0.0f }
+        };
+
+        const std::unique_ptr<uint8_t[]> img_data = Generate_SSSProfile_LUT(res, 6, gauss_variances, diffusion_weights);
+        SceneManagerInternal::WriteImage(&img_data[0], res, res, 4, "assets/textures/skin_diffusion.uncompressed.png");
+    }
+
     // Compile built-in shaders etc.
     InitRendererInternal();
 

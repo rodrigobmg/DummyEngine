@@ -218,6 +218,7 @@ std::unique_ptr<uint8_t[]> Renderer::Generate_SSSProfile_LUT(const int res, cons
     for (int y = 0; y < res; y++) {
         const float py = (float(res - y) + 0.5f) / float(res);
         const float sphere_radius = 4.0f / py;
+
         Ren::Vec3f normalization_factor;
         for (int i = 0; i < SampleCount; i++) {
             const float angle_delta = Ren::Pi<float>() * (2.0f * float(i) / float(SampleCount) - 1.0f);
@@ -250,3 +251,4 @@ std::unique_ptr<uint8_t[]> Renderer::Generate_SSSProfile_LUT(const int res, cons
 
     return img_data;
 }
+
