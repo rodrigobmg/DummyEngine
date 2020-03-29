@@ -26,7 +26,7 @@ const char SCENE_NAME[] = "assets/scenes/"
 const char SCENE_NAME[] = "assets_pc/scenes/"
 #endif
                           //"skin_test.json";
-                          "living_room_gumroad.json";
+                          //"living_room_gumroad.json";
 //"bistro.json";
 //"pbr_test.json";
 //"zenith.json";
@@ -39,6 +39,7 @@ const char SCENE_NAME[] = "assets_pc/scenes/"
 //"sss_test.json";
 //"char_test.json";
 //"tessellation_test.json";
+"clustered_lights.json";
 } // namespace GSDrawTestInternal
 
 GSDrawTest::GSDrawTest(GameBase *game) : GSBaseState(game) {}
@@ -113,6 +114,54 @@ void GSDrawTest::OnPreloadScene(JsObject &js_scene) {
 
             js_objects.elements.push_back(js_leaf_tree);
             js_objects.elements.push_back(js_palm_tree);
+        }
+    }
+#endif
+
+#if 1
+    JsArray &js_objects = js_scene.at("objects").as_arr();
+    if (js_objects.elements.size() < 2) return;
+
+    JsObject 
+        js_lightsource = js_objects.elements.begin()->as_obj();
+    if (!js_lightsource.Has("name")) return;
+
+    if (js_lightsource.at("name").as_str().val != "lightsource") return;
+    
+    for (int j = -4; j < 5; j++) {
+        for (int i = -4; i < 5; i++) {
+            js_lightsource.at("name").as_str().val = "lightsource " + std::to_string(j) + ":" + std::to_string(i);
+
+            {   // set position
+                JsObject &js_lightsource_tr = js_lightsource.at("transform").as_obj();
+                JsArray &js_lightsource_pos = js_lightsource_tr.at("pos").as_arr();
+
+                JsNumber &js_lightsource_posx = js_lightsource_pos.elements.begin()->as_num();
+                JsNumber &js_lightsource_posz = (++(++js_lightsource_pos.elements.begin()))->as_num();
+
+                js_lightsource_posx.val = 2.0 * double(i);
+                js_lightsource_posz.val = 2.0 * double(j);
+            }
+
+            {   // set color
+                JsObject &js_lightsource_ls = js_lightsource.at("light").as_obj();
+                JsArray &js_lightsource_ls_col = js_lightsource_ls.at("color").as_arr();
+
+                JsNumber &js_r = js_lightsource_ls_col[0].as_num();
+                JsNumber &js_g = js_lightsource_ls_col[1].as_num();
+                JsNumber &js_b = js_lightsource_ls_col[2].as_num();
+
+                js_r.val = double(rand() % 255) / 255.0;
+                js_g.val = double(rand() % 255) / 255.0;
+                js_b.val = double(rand() % 255) / 255.0;
+
+                const double max_val = std::max(js_r.val, std::max(js_g.val, js_b.val));
+                js_r.val /= max_val;
+                js_g.val /= max_val;
+                js_b.val /= max_val;
+            }
+
+            js_objects.elements.push_back(js_lightsource);
         }
     }
 #endif

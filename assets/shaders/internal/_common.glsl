@@ -106,7 +106,7 @@
 
 #define REN_MAX_LIGHTS_TOTAL 4096
 #define REN_MAX_DECALS_TOTAL 4096
-#define REN_MAX_ITEMS_TOTAL int(1u << 16u)
+#define REN_MAX_ITEMS_TOTAL int(1u << 24u)
 
 #define REN_OIT_DISABLED            0
 #define REN_OIT_MOMENT_BASED        1

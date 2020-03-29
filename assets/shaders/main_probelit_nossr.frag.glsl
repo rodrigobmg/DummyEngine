@@ -2,6 +2,10 @@
 #extension GL_EXT_texture_buffer : enable
 #extension GL_OES_texture_buffer : enable
 #extension GL_EXT_texture_cube_map_array : enable
+#extension GL_ARB_shader_ballot : enable
+#extension GL_ARB_shader_group_vote : enable
+#extension GL_AMD_gpu_shader_half_float : enable
+#extension GL_AMD_shader_ballot : enable
 //#extension GL_EXT_control_flow_attributes : enable
 #extension GL_GOOGLE_include_directive : enable
 
@@ -54,20 +58,44 @@ layout(location = REN_OUT_COLOR_INDEX) out vec4 outColor;
 layout(location = REN_OUT_NORM_INDEX) out vec4 outNormal;
 layout(location = REN_OUT_SPEC_INDEX) out vec4 outSpecular;
 
+
+void EvaluateLightsource(
+        highp vec3 frag_pos, vec3 frag_norm, highp vec4 lpos_and_index, vec4 lcol_and_radius, vec4 ldir_and_spot, sampler2DShadow shadow_texture, out vec3 out_light) {
+    highp vec3 L = lpos_and_index.xyz - frag_pos;
+    highp float dist = length(L);
+    L /= dist;
+    
+    highp float d = max(dist - lcol_and_radius.w, 0.0);
+    highp float denom = d / lcol_and_radius.w + 1.0;
+    highp float atten = 1.0 / (denom * denom);
+    
+    highp float brightness = max(lcol_and_radius.r, max(lcol_and_radius.g, lcol_and_radius.b));
+    
+    highp float factor = LIGHT_ATTEN_CUTOFF / brightness;
+    atten = (atten - factor) / (1.0 - LIGHT_ATTEN_CUTOFF);
+    atten = clamp(atten, 0.0, 1.0);
+    
+    float _dot1 = clamp(dot(L, frag_norm), 0.0, 1.0);
+    float _dot2 = dot(L, ldir_and_spot.xyz);
+    
+    atten = _dot1 * atten;
+    if (_dot2 > ldir_and_spot.w && (brightness * atten) > FLT_EPS) {
+        int shadowreg_index = floatBitsToInt(lpos_and_index.w);
+        if (shadowreg_index != -1) {
+            vec4 reg_tr = shrd_data.uShadowMapRegions[shadowreg_index].transform;
+            
+            highp vec4 pp = shrd_data.uShadowMapRegions[shadowreg_index].clip_from_world * vec4(frag_pos, 1.0);
+            pp /= pp.w;
+            pp.xyz = pp.xyz * 0.5 + vec3(0.5);
+            pp.xy = reg_tr.xy + pp.xy * reg_tr.zw;
+            
+            atten *= SampleShadowPCF5x5(shadow_texture, pp.xyz);
+        }
+        out_light += lcol_and_radius.rgb * atten * smoothstep(ldir_and_spot.w, ldir_and_spot.w + 0.2, _dot2);
+    }
+}
+
 void main(void) {
-    highp float lin_depth = LinearizeDepth(gl_FragCoord.z, shrd_data.uClipInfo);
-    highp float k = log2(lin_depth / shrd_data.uClipInfo[1]) / shrd_data.uClipInfo[3];
-    int slice = int(floor(k * float(REN_GRID_RES_Z)));
-    
-    int ix = int(gl_FragCoord.x), iy = int(gl_FragCoord.y);
-    int cell_index = GetCellIndex(ix, iy, slice, shrd_data.uResAndFRes.xy);
-    
-    highp uvec2 cell_data = texelFetch(cells_buffer, cell_index).xy;
-    highp uvec2 offset_and_lcount = uvec2(bitfieldExtract(cell_data.x, 0, 24),
-                                          bitfieldExtract(cell_data.x, 24, 8));
-    highp uvec2 dcount_and_pcount = uvec2(bitfieldExtract(cell_data.y, 0, 8),
-                                          bitfieldExtract(cell_data.y, 8, 8));
-    
     vec3 albedo_color = texture(diffuse_texture, aVertexUVs_).rgb;
     
     vec2 duv_dx = dFdx(aVertexUVs_), duv_dy = dFdy(aVertexUVs_);
@@ -76,122 +104,86 @@ void main(void) {
     
     vec3 dp_dx = dFdx(aVertexPos_);
     vec3 dp_dy = dFdy(aVertexPos_);
-
-    for (uint i = offset_and_lcount.x; i < offset_and_lcount.x + dcount_and_pcount.x; i++) {
-        highp uint item_data = texelFetch(items_buffer, int(i)).x;
-        int di = int(bitfieldExtract(item_data, 12, 12));
-        
-        mat4 de_proj;
-        de_proj[0] = texelFetch(decals_buffer, di * 6 + 0);
-        de_proj[1] = texelFetch(decals_buffer, di * 6 + 1);
-        de_proj[2] = texelFetch(decals_buffer, di * 6 + 2);
-        de_proj[3] = vec4(0.0, 0.0, 0.0, 1.0);
-        de_proj = transpose(de_proj);
-        
-        vec4 pp = de_proj * vec4(aVertexPos_, 1.0);
-        pp /= pp[3];
-        
-        vec3 app = abs(pp.xyz);
-        vec2 uvs = pp.xy * 0.5 + 0.5;
-        
-        vec2 duv_dx = 0.5 * (de_proj * vec4(dp_dx, 0.0)).xy;
-        vec2 duv_dy = 0.5 * (de_proj * vec4(dp_dy, 0.0)).xy;
-        
-        if (app.x < 1.0 && app.y < 1.0 && app.z < 1.0) {
-            vec4 diff_uvs_tr = texelFetch(decals_buffer, di * 6 + 3);
-            float decal_influence = 0.0;
-            
-            if (diff_uvs_tr.z > 0.0) {
-                vec2 diff_uvs = diff_uvs_tr.xy + diff_uvs_tr.zw * uvs;
-                
-                vec2 _duv_dx = diff_uvs_tr.zw * duv_dx;
-                vec2 _duv_dy = diff_uvs_tr.zw * duv_dy;
-            
-                vec4 decal_diff = textureGrad(decals_texture, diff_uvs, _duv_dx, _duv_dy);
-                decal_influence = decal_diff.a;
-                albedo_color = mix(albedo_color, SRGBToLinear(decal_diff.rgb), decal_influence);
-            }
-            
-            vec4 norm_uvs_tr = texelFetch(decals_buffer, di * 6 + 4);
-            
-            if (norm_uvs_tr.z > 0.0) {
-                vec2 norm_uvs = norm_uvs_tr.xy + norm_uvs_tr.zw * uvs;
-                
-                vec2 _duv_dx = 2.0 * norm_uvs_tr.zw * duv_dx;
-                vec2 _duv_dy = 2.0 * norm_uvs_tr.zw * duv_dy;
-            
-                vec3 decal_norm = textureGrad(decals_texture, norm_uvs, _duv_dx, _duv_dy).wyz;
-                normal_color = mix(normal_color, decal_norm, decal_influence);
-            }
-            
-            vec4 spec_uvs_tr = texelFetch(decals_buffer, di * 6 + 5);
-            
-            if (spec_uvs_tr.z > 0.0) {
-                vec2 spec_uvs = spec_uvs_tr.xy + spec_uvs_tr.zw * uvs;
-                
-                vec2 _duv_dx = spec_uvs_tr.zw * duv_dx;
-                vec2 _duv_dy = spec_uvs_tr.zw * duv_dy;
-            
-                vec4 decal_spec = textureGrad(decals_texture, spec_uvs, _duv_dx, _duv_dy);
-                specular_color = mix(specular_color, decal_spec, decal_influence);
-            }
-        }
-    }
-
+    
     vec3 normal = normal_color * 2.0 - 1.0;
-    normal = normalize(mat3(cross(aVertexTangent_, aVertexNormal_), aVertexTangent_,
-                            aVertexNormal_) * normal);
+    normal = normalize(mat3(aVertexTangent_, cross(aVertexNormal_, aVertexTangent_), aVertexNormal_) * normal);
     
-    vec3 additional_light = vec3(0.0, 0.0, 0.0);
-    
-    for (uint i = offset_and_lcount.x; i < offset_and_lcount.x + offset_and_lcount.y; i++) {
-        highp uint item_data = texelFetch(items_buffer, int(i)).x;
-        int li = int(bitfieldExtract(item_data, 0, 12));
+    int vgpr_cell_index = GetFragCellIndex(shrd_data.uClipInfo, shrd_data.uResAndFRes.xy);
 
-        vec4 pos_and_radius = texelFetch(lights_buffer, li * 3 + 0);
-        highp vec4 col_and_index = texelFetch(lights_buffer, li * 3 + 1);
-        vec4 dir_and_spot = texelFetch(lights_buffer, li * 3 + 2);
-        
-        vec3 L = pos_and_radius.xyz - aVertexPos_;
-        float dist = length(L);
-        float d = max(dist - pos_and_radius.w, 0.0);
-        L /= dist;
-        
-        highp float denom = d / pos_and_radius.w + 1.0;
-        highp float atten = 1.0 / (denom * denom);
-        
-        highp float brightness = max(col_and_index.x, max(col_and_index.y, col_and_index.z));
-        
-        highp float factor = LIGHT_ATTEN_CUTOFF / brightness;
-        atten = (atten - factor) / (1.0 - LIGHT_ATTEN_CUTOFF);
-        atten = max(atten, 0.0);
-        
-        float _dot1 = max(dot(L, normal), 0.0);
-        float _dot2 = dot(L, dir_and_spot.xyz);
-        
-        atten = _dot1 * atten;
-        if (_dot2 > dir_and_spot.w && (brightness * atten) > FLT_EPS) {
-            int shadowreg_index = floatBitsToInt(col_and_index.w);
-            if (shadowreg_index != -1) {
-                vec4 reg_tr = shrd_data.uShadowMapRegions[shadowreg_index].transform;
-                
-                highp vec4 pp = shrd_data.uShadowMapRegions[shadowreg_index].clip_from_world * vec4(aVertexPos_, 1.0);
-                pp /= pp.w;
-                pp.xyz = pp.xyz * 0.5 + vec3(0.5);
-                pp.xy = reg_tr.xy + pp.xy * reg_tr.zw;
-                
-                atten *= SampleShadowPCF5x5(shadow_texture, pp.xyz);
-            }
+    // Check if we can use simple path
+#if defined(GL_ARB_shader_ballot) && defined(GL_ARB_shader_group_vote) && 0
+    int sgpr_cell_index = readFirstInvocationARB(vgpr_cell_index);
+    bool whole_wave_in_single_cell = allInvocationsARB(vgpr_cell_index == sgpr_cell_index);
+#else
+	const int sgpr_cell_index = -1;
+    const bool whole_wave_in_single_cell = false;
+#endif
+
+    vec3 additional_light = vec3(0.0);
+
+    if (whole_wave_in_single_cell) {
+        highp uvec2 sgpr_cell_data = texelFetch(cells_buffer, sgpr_cell_index).xy;
+        highp uint sgpr_item_offset = bitfieldExtract(sgpr_cell_data.x, 0, 24);
+        uint sgpr_lcount = bitfieldExtract(sgpr_cell_data.x, 24, 8);
+        uint sgpr_dcount = bitfieldExtract(sgpr_cell_data.y, 0, 8);
+        uint sgpr_pcount = bitfieldExtract(sgpr_cell_data.y, 8, 8);
+
+        for (uint i = 0; i < sgpr_lcount; i++) {
+            highp uint item_data = texelFetch(items_buffer, int(sgpr_item_offset + i)).x;
+            int li = int(bitfieldExtract(item_data, 0, 12));
+
+            highp vec4 lpos_and_index = texelFetch(lights_buffer, li * 3 + 0);
+            vec4 lcol_and_radius = texelFetch(lights_buffer, li * 3 + 1);
+            vec4 ldir_and_spot = texelFetch(lights_buffer, li * 3 + 2);
             
-            additional_light += col_and_index.xyz * atten *
-                                smoothstep(dir_and_spot.w, dir_and_spot.w + 0.2, _dot2);
+            EvaluateLightsource(aVertexPos_, normal, lpos_and_index, lcol_and_radius, ldir_and_spot, shadow_texture, additional_light);
         }
+    } else {
+        highp uvec2 vgpr_cell_data = texelFetch(cells_buffer, vgpr_cell_index).xy;
+        highp uint vgpr_item_offset = bitfieldExtract(vgpr_cell_data.x, 0, 24);
+        uint vgpr_lcount = bitfieldExtract(vgpr_cell_data.x, 24, 8);
+        uint vgpr_dcount = bitfieldExtract(vgpr_cell_data.y, 0, 8);
+        uint vgpr_pcount = bitfieldExtract(vgpr_cell_data.y, 8, 8);
+
+#if defined(GL_AMD_shader_ballot)
+        uint vgpr_item_index = 0u;
+        highp uint vgpr_item_data = texelFetch(items_buffer, int(vgpr_item_offset + vgpr_item_index)).x;
+        int vgpr_li = int(bitfieldExtract(vgpr_item_data, 0, 12));
+
+        while (vgpr_item_index < vgpr_lcount) {
+            int sgpr_li = minInvocationsNonUniformAMD(vgpr_li);
+            if (vgpr_li == sgpr_li) {
+                highp vec4 lpos_and_radius = texelFetch(lights_buffer, sgpr_li * 3 + 0);
+                highp vec4 lcol_and_index = texelFetch(lights_buffer, sgpr_li * 3 + 1);
+                vec4 ldir_and_spot = texelFetch(lights_buffer, sgpr_li * 3 + 2);
+
+                // early fetch next item to reduce latency
+				if (++vgpr_item_index < vgpr_lcount) {
+					vgpr_item_data = texelFetch(items_buffer, int(vgpr_item_offset + vgpr_item_index)).x;
+					vgpr_li = int(bitfieldExtract(vgpr_item_data, 0, 12));
+				}
+
+				EvaluateLightsource(aVertexPos_, normal, lpos_and_radius, lcol_and_index, ldir_and_spot, shadow_texture, additional_light);
+            }
+        }
+#else
+        for (uint i = 0; i < vgpr_lcount; i++) {
+            highp uint item_data = texelFetch(items_buffer, int(vgpr_item_offset + i)).x;
+            int li = int(bitfieldExtract(item_data, 0, 12));
+
+            highp vec4 lpos_and_radius = texelFetch(lights_buffer, li * 3 + 0);
+            highp vec4 lcol_and_index = texelFetch(lights_buffer, li * 3 + 1);
+            vec4 ldir_and_spot = texelFetch(lights_buffer, li * 3 + 2);
+            
+            EvaluateLightsource(aVertexPos_, normal, lpos_and_radius, lcol_and_index, ldir_and_spot, shadow_texture, additional_light);
+        }
+#endif
     }
-    
+
     vec3 indirect_col = vec3(0.0);
     float total_fade = 0.0;
     
-    for (uint i = offset_and_lcount.x; i < offset_and_lcount.x + dcount_and_pcount.y; i++) {
+    /*for (uint i = offset_and_lcount.x; i < offset_and_lcount.x + dcount_and_pcount.y; i++) {
         highp uint item_data = texelFetch(items_buffer, int(i)).x;
         int pi = int(bitfieldExtract(item_data, 24, 8));
         
@@ -203,7 +195,7 @@ void main(void) {
                                                           shrd_data.uProbes[pi].sh_coeffs[1],
                                                           shrd_data.uProbes[pi].sh_coeffs[2]);
         total_fade += fade;
-    }
+    }*/
     
     indirect_col /= max(total_fade, 1.0);
     indirect_col = max(indirect_col, vec3(0.0));
@@ -211,10 +203,10 @@ void main(void) {
     float lambert = clamp(dot(normal, shrd_data.uSunDir.xyz), 0.0, 1.0);
     float visibility = 0.0;
     if (lambert > 0.00001) {
-        visibility = GetSunVisibility(lin_depth, shadow_texture, aVertexShUVs_);
+        //visibility = GetSunVisibility(lin_depth, shadow_texture, aVertexShUVs_);
     }
     
-    vec2 ao_uvs = vec2(ix, iy) / shrd_data.uResAndFRes.zw;
+    vec2 ao_uvs = gl_FragCoord.xy / shrd_data.uResAndFRes.zw;
     float ambient_occlusion = textureLod(ao_texture, ao_uvs, 0.0).r;
     vec3 diffuse_color = albedo_color * (shrd_data.uSunCol.xyz * lambert * visibility +
                                          ambient_occlusion * ambient_occlusion * indirect_col +
@@ -228,4 +220,10 @@ void main(void) {
     outColor = vec4(diffuse_color * kD, 1.0);
     outNormal = vec4(normal * 0.5 + 0.5, 0.0);
     outSpecular = specular_color;
+
+    /*if (!whole_wave_in_single_cell) {
+        outColor.r += 0.02;
+    } else {
+       outColor.g += 0.02;
+    }*/
 }

@@ -145,7 +145,7 @@ bool SceneManager::HPreprocessShader(assets_context_t &ctx, const char *in_file,
         }
     }
 
-    if (strcmp(ctx.platform, "pc") == 0) {
+    if (strcmp(ctx.platform, "pc") == 0 && 0) {
         std::string spv_file = out_file;
 
         size_t n;

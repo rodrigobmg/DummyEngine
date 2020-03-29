@@ -95,8 +95,6 @@ struct JsArray {
     JsArray(const JsArray &rhs) = default;
     JsArray(JsArray &&rhs) = default;
     JsArray(const JsElement *v, size_t num);
-    //JsArray(const std::initializer_list<JsElement> &l);
-    //JsArray(std::initializer_list<JsElement> &&l);
 
     JsElement &operator[](size_t i);
     const JsElement &operator[](size_t i) const;

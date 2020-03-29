@@ -89,14 +89,6 @@ JsArray::JsArray(const JsElement *v, size_t num) {
     elements.assign(v, v + num);
 }
 
-/*JsArray::JsArray(const std::initializer_list<JsElement> &l) {
-    elements.assign(l);
-}
-
-JsArray::JsArray(std::initializer_list<JsElement> &&l) {
-    elements.assign(l);
-}*/
-
 JsElement &JsArray::operator[](size_t i) {
     auto it = elements.begin();
     std::advance(it, i);

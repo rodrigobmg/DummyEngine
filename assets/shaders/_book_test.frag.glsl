@@ -88,19 +88,19 @@ void main(void) {
         highp uint item_data = texelFetch(items_buffer, int(i)).x;
         int li = int(bitfieldExtract(item_data, 0, 12));
 
-        vec4 pos_and_radius = texelFetch(lights_buffer, li * 3 + 0);
-        highp vec4 col_and_index = texelFetch(lights_buffer, li * 3 + 1);
+        highp vec4 pos_and_index = texelFetch(lights_buffer, li * 3 + 0);
+        vec4 col_and_radius = texelFetch(lights_buffer, li * 3 + 1);
         vec4 dir_and_spot = texelFetch(lights_buffer, li * 3 + 2);
         
-        vec3 L = pos_and_radius.xyz - aVertexPos_;
+        vec3 L = pos_and_index.xyz - aVertexPos_;
         float dist = length(L);
-        float d = max(dist - pos_and_radius.w, 0.0);
+        float d = max(dist - col_and_radius.w, 0.0);
         L /= dist;
         
-        highp float denom = d / pos_and_radius.w + 1.0;
+        highp float denom = d / col_and_radius.w + 1.0;
         highp float atten = 1.0 / (denom * denom);
         
-        highp float brightness = max(col_and_index.x, max(col_and_index.y, col_and_index.z));
+        highp float brightness = max(col_and_radius.x, max(col_and_radius.y, col_and_radius.z));
         
         highp float factor = LIGHT_ATTEN_CUTOFF / brightness;
         atten = (atten - factor) / (1.0 - LIGHT_ATTEN_CUTOFF);
@@ -111,7 +111,7 @@ void main(void) {
         
         atten = _dot1 * atten;
         if (_dot2 > dir_and_spot.w && (brightness * atten) > FLT_EPS) {
-            int shadowreg_index = floatBitsToInt(col_and_index.w);
+            int shadowreg_index = floatBitsToInt(pos_and_index.w);
             if (shadowreg_index != -1) {
                 vec4 reg_tr = shrd_data.uShadowMapRegions[shadowreg_index].transform;
                 
@@ -124,8 +124,7 @@ void main(void) {
                 atten *= SampleShadowPCF5x5(shadow_texture, pp.xyz);
             }
             
-            additional_light += col_and_index.xyz * atten *
-                smoothstep(dir_and_spot.w, dir_and_spot.w + 0.2, _dot2);
+            additional_light += col_and_radius.rgb * atten * smoothstep(dir_and_spot.w, dir_and_spot.w + 0.2, _dot2);
         }
     }
     

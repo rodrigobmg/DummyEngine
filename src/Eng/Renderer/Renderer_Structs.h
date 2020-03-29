@@ -8,8 +8,8 @@
 #include "Renderer_GL_Defines.inl"
 
 struct LightSourceItem {
-    float pos[3], radius;
-    float col[3]; int shadowreg_index;
+    float pos[3]; int shadowreg_index;
+    float col[3], radius;
     float dir[3], spot;
 };
 static_assert(sizeof(LightSourceItem) == 48, "!");

@@ -306,4 +306,16 @@ float TransparentDepthWeight(float z, float alpha) {
     return alpha * max(3e3 * pow3(1.0 - z), 1e-2);
 }
 
+int GetCellIndex_(ivec2 frag_coord, float lin_depth, vec4 clip_info, vec2 res) {
+	highp float k = log2(lin_depth / clip_info[1]) / clip_info[3];
+    int slice = int(k * float(REN_GRID_RES_Z));
+    return slice * REN_GRID_RES_X * REN_GRID_RES_Y + (frag_coord.y * REN_GRID_RES_Y / int(res.y)) * REN_GRID_RES_X + frag_coord.x * REN_GRID_RES_X / int(res.x);
+}
+
+int GetFragCellIndex(vec4 clip_info, vec2 res) {
+	ivec2 icoord = ivec2(gl_FragCoord.xy);
+	float lin_depth = LinearizeDepth(gl_FragCoord.z, clip_info);
+    return GetCellIndex_(icoord, lin_depth, clip_info, res);
+}
+
 )"
