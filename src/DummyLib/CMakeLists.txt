@@ -30,6 +30,8 @@ set(STATES_SOURCES  States/GSCreate.h
                     States/GSBaseState.cpp
                     States/GSDrawTest.h
                     States/GSDrawTest.cpp
+                    States/GSFluidTest.h
+                    States/GSFluidTest.cpp
                     States/GSPlayTest.h
                     States/GSPlayTest.cpp
                     States/GSUITest.h

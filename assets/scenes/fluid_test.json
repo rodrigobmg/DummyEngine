@@ -1,0 +1,50 @@
+{
+	"name" : "vegetation_test2", 
+	"environment" : {
+		"sun_dir" : [
+			0.57735, 
+			-0.57735, 
+			-0.57735
+		], 
+		"sun_col" : [
+			1, 
+			1, 
+			1
+		], 
+		"sun_softness" : 0.1, 
+		"env_map" : "env/clear", 
+		"env_map_pt" : "env/noon_grass_2k.hdr"
+	}, 
+	"objects" : [
+		{
+			"name" : "plane",
+			"transform" : {
+				"pos" : [
+					0, 
+					0, 
+					0
+				], 
+				"rot" : [
+					0, 
+					0, 
+					0
+				]
+			}, 
+			"drawable" : {
+				"mesh_file" : "ground_plane_200x200.mesh",
+				"material_override" : [ "fluid_debug.txt" ],
+			}
+		}
+	], 
+	"camera" : {
+		"view_origin" : [
+			100.0, 100.0, 100.0
+		], 
+		"view_dir" : [
+			-0.57, -0.57, -0.57
+		], 
+		"fwd_speed" : 0.75, 
+		"fov" : 45, 
+		"max_exposure" : 1000
+	}
+}

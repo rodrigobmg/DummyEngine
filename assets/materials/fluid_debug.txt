@@ -1,0 +1,5 @@
+gl_program: fluid_debug _fluid_debug.vert.glsl _fluid_debug.frag.glsl
+sw_program: main
+texture: checker.tga srgb
+texture: default_normalmap.tga
+texture: default_specular.tga
