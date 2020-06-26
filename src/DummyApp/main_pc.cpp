@@ -1,128 +1,20 @@
 #include "DummyApp.h"
 
+#include <cassert>
+#include <algorithm>
 #include <fstream>
-
-enum class eWaveFormat : uint16_t {
-    PCM = 0x0001,
-    IEEE_FLOAT = 0x0003,
-    ALAW = 0x0006,
-    MULAW = 0x0007,
-    EXTENSIBLE = 0xFFFE
-};
-
-struct WaveChunk {
-    char id[4];
-    uint32_t size;
-    eWaveFormat format;
-    uint16_t channels_count;
-    uint32_t samples_per_second;
-    uint32_t bytes_per_second;
-    uint16_t block_align;
-    uint16_t bits_per_sample;
-    uint16_t ext_size;
-    uint16_t valid_bits_per_sample;
-    uint32_t channel_mask;
-    char sub_format[16];
-};
-static_assert(sizeof(WaveChunk) == 48, "!");
-
-int LoadWAV(std::istream &in_data, int &channels, int &samples_per_second,
-             int &bits_per_sample, std::unique_ptr<uint8_t[]> &samples) {
-    { // check identifiers
-        char chunk_id[4];
-        if (!in_data.read(chunk_id, 4)) {
-            return 0;
-        }
-        if (chunk_id[0] != 'R' || chunk_id[1] != 'I' || chunk_id[2] != 'F' ||
-            chunk_id[3] != 'F') {
-            return 0;
-        }
-
-        uint32_t chunk_size;
-        if (!in_data.read((char *)&chunk_size, sizeof(uint32_t))) {
-            return 0;
-        }
-
-        char wave_id[4];
-        if (!in_data.read(wave_id, 4)) {
-            return 0;
-        }
-        if (wave_id[0] != 'W' || wave_id[1] != 'A' || wave_id[2] != 'V' ||
-            wave_id[3] != 'E') {
-            return 0;
-        }
-    }
-
-    WaveChunk chunk = {};
-    if (!in_data.read((char *)&chunk, 8)) {
-        return 0;
-    }
-    if (chunk.id[0] != 'f' || chunk.id[1] != 'm' || chunk.id[2] != 't' ||
-        chunk.id[3] != ' ') {
-        return 0;
-    }
-
-    if (!in_data.read((char *)&chunk.format, chunk.size)) {
-        return 0;
-    }
-
-    if (chunk.format != eWaveFormat::PCM) {
-        // not supported
-        return 0;
-    }
-
-    char chunk_id[4];
-    if (!in_data.read(chunk_id, 4)) {
-        return 0;
-    }
-
-    if (chunk_id[0] == 'f' && chunk_id[1] == 'a' && chunk_id[2] == 'c' &&
-        chunk_id[3] == 't') {
-        uint32_t chunk_size;
-        if (!in_data.read((char *)&chunk_size, sizeof(uint32_t))) {
-            return 0;
-        }
-
-        // skip
-        if (!in_data.seekg(chunk_size, std::ios::cur)) {
-            return 0;
-        }
-
-        if (!in_data.read(chunk_id, 4)) {
-            return 0;
-        }
-    }
-
-    if (chunk_id[0] != 'd' || chunk_id[1] != 'a' || chunk_id[2] != 't' ||
-        chunk_id[3] != 'a') {
-        return 0;
-    }
-
-    uint32_t chunk_size;
-    if (!in_data.read((char *)&chunk_size, sizeof(uint32_t))) {
-        return 0;
-    }
-
-    samples.reset(new uint8_t[chunk_size]);
-    if (!in_data.read((char *)&samples[0], chunk_size)) {
-        return 0;
-    }
-
-    channels = (int)chunk.channels_count;
-    samples_per_second = (int)chunk.samples_per_second;
-    bits_per_sample = (int)chunk.bits_per_sample;
-
-    return (int)chunk_size;
-}
 
 #include <Snd/OpenAL/include/al.h>
 #include <Snd/OpenAL/include/alc.h>
 
 #include <Snd/Context.h>
+#include <Snd/Source.h>
+#include <Snd/Utils.h>
 #include <Eng/Log.h>
 
 #undef main
 int main(int argc, char *argv[]) {
+#if 0
     LogStdout log;
 
     Snd::Context ctx;
@@ -130,56 +22,80 @@ int main(int argc, char *argv[]) {
 
     /////////////////////////////////////////////////////////////////////////
 
-    std::ifstream in_file("assets/sounds/africa-toto.wav", std::ios::binary);
+    const char *sound_name = "assets/sounds/lawyer/28_trial_by_combat.wav";
+    std::ifstream in_file(sound_name, std::ios::binary);
     if (!in_file) {
         return -1;
     }
 
-    int channels, samples_per_second, bits_per_sample;
+    int channels, samples_per_sec, bits_per_sample;
     std::unique_ptr<uint8_t[]> samples;
-    const int size = LoadWAV(in_file, channels, samples_per_second, bits_per_sample, samples);
+    const int size = Snd::LoadWAV(in_file, channels, samples_per_sec, bits_per_sample, samples);
     if (!size) {
         return -1;
     }
 
     /////////////////////////////////////////////////////////////////////////
 
-    ALuint buf;
-    alGenBuffers(1, &buf);
+    Snd::BufParams params;
 
-    ALenum format;
     if (channels == 1 && bits_per_sample == 8) {
-        format = AL_FORMAT_MONO8;
+        params.format = Snd::eBufFormat::Mono8;
     } else if (channels == 1 && bits_per_sample == 16) {
-        format = AL_FORMAT_MONO16;
+        params.format = Snd::eBufFormat::Mono16;
     } else if (channels == 2 && bits_per_sample == 8) {
-        format = AL_FORMAT_STEREO8;
+        params.format = Snd::eBufFormat::Stereo8;
     } else if (channels == 2 && bits_per_sample == 16) {
-        format = AL_FORMAT_STEREO16;
+        params.format = Snd::eBufFormat::Stereo16;
     } else {
         return -1;
     }
+    params.samples_per_sec = samples_per_sec;
 
-    alBufferData(buf, format, &samples[0], size, samples_per_second);
+    const int BufferSize = 32 * 1024;
+    const int BuffersCount = 4;
+    Snd::BufferRef sound_bufs[BuffersCount];
 
-    ALuint source;
-    alGenSources(1, &source);
-    alSourcef(source, AL_PITCH, 1);
-    alSourcef(source, AL_GAIN, 1.0f);
-    alSource3f(source, AL_POSITION, 0, 0, 0);
-    alSource3f(source, AL_VELOCITY, 0, 0, 0);
-    alSourcei(source, AL_LOOPING, AL_FALSE);
-    alSourcei(source, AL_BUFFER, buf);
-
-    alSourcePlay(source);
-
-    ALint state = AL_PLAYING;
-    while (state == AL_PLAYING) {
-        alGetSourcei(source, AL_SOURCE_STATE, &state);
+    int buf_pos = 0;
+    
+    for (int i = 0; i < BuffersCount; i++) {
+        char buf[16];
+        sprintf(buf, "BUF %i", i);
+        
+        Snd::eBufLoadStatus status;
+        sound_bufs[i] = ctx.LoadBuffer(buf, &samples[buf_pos], BufferSize,
+                                       params, &status);
+        buf_pos += BufferSize;
+        assert(status == Snd::eBufLoadStatus::CreatedFromData);
     }
 
-    return 0;
+    Snd::Source snd_source;
 
+    const float source_gain = 1.0f;
+    const float source_pos[] = { 0.0f, 0.0f, 0.0f };
+    snd_source.Init(source_gain, source_pos);
+
+    assert(snd_source.GetState() == Snd::eSrcState::Initial);
+
+    //snd_source.SetBuffer(sound_buf);
+    snd_source.EnqueueBuffers(&sound_bufs[0], BuffersCount);
+    snd_source.Play();
+
+    assert(snd_source.GetState() == Snd::eSrcState::Playing);
+    while (snd_source.GetState() == Snd::eSrcState::Playing || buf_pos < size) {
+        Snd::BufferRef buf = snd_source.UnqueueProcessedBuffer();
+        if (buf) {
+            printf("buf %u is done\n", buf->id());
+            const uint32_t chunk_size = std::min(BufferSize, size - buf_pos);
+            buf->SetData(&samples[buf_pos], chunk_size, params);
+            buf_pos += chunk_size;
+            snd_source.EnqueueBuffers(&buf, 1);
+        }
+    }
+    assert(buf_pos == size);
+
+    return 0;
+#endif
     return DummyApp().Run(argc, argv);
 }
 

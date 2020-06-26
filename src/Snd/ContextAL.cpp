@@ -3,6 +3,8 @@
 #include <al.h>
 #include <alc.h>
 
+#include "Log.h"
+
 Snd::Context::~Context() {
     ReleaseAll();
 
@@ -10,7 +12,7 @@ Snd::Context::~Context() {
     alcCloseDevice(oal_device_);
 }
 
-bool Snd::Context::Init(ILog* log) {
+bool Snd::Context::Init(ILog *log) {
     oal_device_ = alcOpenDevice(nullptr);
     if (!oal_device_) {
         log->Error("Failed to open device!");
@@ -29,4 +31,11 @@ bool Snd::Context::Init(ILog* log) {
     }
 
     return true;
+}
+
+void Snd::Context::SetupListener(const float pos[3], const float vel[3], const float fwd_up[6]) {
+    alListener3f(AL_POSITION, pos[0], pos[1], pos[2]);
+    alListener3f(AL_VELOCITY, vel[0], vel[1], vel[2]);
+    alListener3f(AL_POSITION, pos[0], pos[1], pos[2]);
+    alListenerfv(AL_ORIENTATION, &fwd_up[0]);
 }

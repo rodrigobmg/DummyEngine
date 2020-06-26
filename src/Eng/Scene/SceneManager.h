@@ -15,6 +15,10 @@ namespace Sys {
 class ThreadPool;
 }
 
+namespace Snd {
+class Context;
+}
+
 struct assets_context_t {
     const char *platform;
     Ren::ILog *log;
@@ -22,8 +26,8 @@ struct assets_context_t {
 
 class SceneManager : public std::enable_shared_from_this<SceneManager> {
   public:
-    SceneManager(Ren::Context &ctx, Ray::RendererBase &ray_renderer,
-                 Sys::ThreadPool &threads);
+    SceneManager(Ren::Context &ren_ctx, Snd::Context &snd_ctx,
+                 Ray::RendererBase &ray_renderer, Sys::ThreadPool &threads);
     ~SceneManager();
 
     SceneManager(const SceneManager &rhs) = delete;
@@ -97,6 +101,8 @@ class SceneManager : public std::enable_shared_from_this<SceneManager> {
     void PostloadDecal(const JsObject &js_comp_obj, void *comp, Ren::Vec3f obj_bbox[2]);
     void PostloadLightProbe(const JsObject &js_comp_obj, void *comp,
                             Ren::Vec3f obj_bbox[2]);
+    void PostloadSoundSource(const JsObject &js_comp_obj, void *comp,
+                             Ren::Vec3f obj_bbox[2]);
 
     Ren::MaterialRef OnLoadMaterial(const char *name);
     Ren::ProgramRef OnLoadProgram(const char *name, const char *arg1, const char *arg2);
@@ -109,13 +115,16 @@ class SceneManager : public std::enable_shared_from_this<SceneManager> {
 
     int scene_texture_load_counter_ = 0;
 
-    Ren::Context &ctx_;
+    Ren::Context &ren_ctx_;
+    Snd::Context &snd_ctx_;
     Ray::RendererBase &ray_renderer_;
     Sys::ThreadPool &threads_;
     std::vector<Ray::RegionContext> ray_reg_ctx_;
     std::shared_ptr<Ray::SceneBase> ray_scene_;
 
     Ren::Camera cam_;
+    Ren::Vec3f last_cam_pos_;
+    double last_cam_time_s_ = 0.0;
 
     SceneData scene_data_;
     std::vector<uint32_t> changed_objects_, last_changed_objects_;

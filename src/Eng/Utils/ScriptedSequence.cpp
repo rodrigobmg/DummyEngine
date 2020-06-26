@@ -2,6 +2,7 @@
 
 #include <limits>
 
+#include <Snd/Utils.h>
 #include <Sys/Json.h>
 
 #include "../Scene/SceneManager.h"
@@ -11,15 +12,18 @@ const char *TrackTypeNames[] = {"actor", "camera"};
 
 #if defined(__ANDROID__)
 const char *MODELS_PATH = "./assets/models/";
+const char *SOUNDS_PATH = "./assets/sounds/";
 #else
 const char *MODELS_PATH = "./assets_pc/models/";
+const char *SOUNDS_PATH = "./assets_pc/sounds/";
 #endif
 } // namespace ScriptedSequenceInternal
 
 const char *ScriptedSequence::ActionTypeNames[] = {"play", "look"};
 
-ScriptedSequence::ScriptedSequence(Ren::Context &ctx, SceneManager &scene_manager)
-    : ctx_(ctx), scene_manager_(scene_manager) {
+ScriptedSequence::ScriptedSequence(Ren::Context &ren_ctx, Snd::Context &snd_ctx,
+                                   SceneManager &scene_manager)
+    : ren_ctx_(ren_ctx), snd_ctx_(snd_ctx), scene_manager_(scene_manager) {
     Reset();
 }
 
@@ -66,7 +70,8 @@ bool ScriptedSequence::Load(const char *lookup_name, const JsObject &js_seq) {
             }
 
             if (track.type == eTrackType::Invalid) {
-                ctx_.log()->Error("Unknown track type %s.", js_track_type.val.c_str());
+                ren_ctx_.log()->Error("Unknown track type %s.",
+                                      js_track_type.val.c_str());
                 return false;
             }
 
@@ -92,8 +97,8 @@ bool ScriptedSequence::Load(const char *lookup_name, const JsObject &js_seq) {
                 }
 
                 if (action.type == eActionType::Invalid) {
-                    ctx_.log()->Error("Unknown action type %s.",
-                                      js_action_type.val.c_str());
+                    ren_ctx_.log()->Error("Unknown action type %s.",
+                                          js_action_type.val.c_str());
                     return false;
                 }
 
@@ -103,7 +108,7 @@ bool ScriptedSequence::Load(const char *lookup_name, const JsObject &js_seq) {
                     action.time_end = js_action.at("time_end").as_num().val;
                 } else {
                     // TODO: derive from audio length etc.
-                    ctx_.log()->Error("Action end_time is not set");
+                    ren_ctx_.log()->Error("Action end_time is not set");
                     return false;
                 }
 
@@ -163,13 +168,80 @@ bool ScriptedSequence::Load(const char *lookup_name, const JsObject &js_seq) {
                     Sys::MemBuf mem = {&in_file_data[0], in_file_size};
                     std::istream in_file_stream(&mem);
 
-                    action.anim_ref =
-                        ctx_.LoadAnimSequence(js_action_anim.val.c_str(), in_file_stream);
+                    action.anim_ref = ren_ctx_.LoadAnimSequence(
+                        js_action_anim.val.c_str(), in_file_stream);
                 }
 
                 if (js_action.Has("caption")) {
                     const JsString &js_caption = js_action.at("caption").as_str();
                     action.caption = js_caption.val;
+                }
+
+                if (js_action.Has("sound")) {
+                    const JsString &js_action_sound = js_action.at("sound").as_str();
+
+                    const std::string sound_path =
+                        std::string(SOUNDS_PATH) + js_action_sound.val;
+
+                    // TODO: CHANGE THIS!!!
+
+                    Sys::AssetFile in_file(sound_path.c_str());
+                    size_t in_file_size = in_file.size();
+
+                    std::unique_ptr<uint8_t[]> in_file_data(new uint8_t[in_file_size]);
+                    in_file.Read((char *)&in_file_data[0], in_file_size);
+
+                    Sys::MemBuf mem = {&in_file_data[0], in_file_size};
+                    std::istream in_file_stream(&mem);
+
+                    int channels, samples_per_sec, bits_per_sample;
+                    std::unique_ptr<uint8_t[]> samples;
+                    const int size =
+                        Snd::LoadWAV(in_file_stream, channels, samples_per_sec,
+                                     bits_per_sample, samples);
+                    assert(size);
+
+                    Snd::BufParams params;
+                    int samples_count;
+
+                    if (channels == 1 && bits_per_sample == 8) {
+                        params.format = Snd::eBufFormat::Mono8;
+                        samples_count = size;
+                    } else if (channels == 1 && bits_per_sample == 16) {
+                        params.format = Snd::eBufFormat::Mono16;
+                        samples_count = size / 2;
+                    } /*else if (channels == 2 && bits_per_sample == 8) {
+                        params.format = Snd::eBufFormat::Stereo8;
+                    } else if (channels == 2 && bits_per_sample == 16) {
+                        params.format = Snd::eBufFormat::Stereo16;
+                    }*/
+                    else {
+                        return false;
+                    }
+                    params.samples_per_sec = samples_per_sec;
+
+                    const char *name = js_action_sound.val.c_str();
+
+                    Snd::eBufLoadStatus status;
+                    action.sound_ref = {};
+                    action.sound_ref =
+                        snd_ctx_.LoadBuffer(name, &samples[0], size, params, &status);
+                    assert(status == Snd::eBufLoadStatus::CreatedFromData);
+
+                    action.sound_wave_tex = {};
+                    action.sound_wave_tex =
+                        RenderSoundWaveForm(name, &samples[0], samples_count, params);
+                } else {
+                    action.sound_ref = {};
+                    action.sound_wave_tex = {};
+                }
+
+                if (js_action.Has("sound_offset")) {
+                    const JsNumber &js_action_sound_off =
+                        js_action.at("sound_offset").as_num();
+                    action.sound_offset = js_action_sound_off.val;
+                } else {
+                    action.sound_offset = 0.0;
                 }
             }
         }
@@ -272,6 +344,15 @@ void ScriptedSequence::Save(JsObject &js_seq) {
                         js_action.Push("caption", JsString{action.caption});
                     }
 
+                    if (!action.sound_ref) {
+                        js_action.Push("sound",
+                                       JsString{action.sound_ref->name().c_str()});
+                    }
+
+                    if (std::abs(action.sound_offset) > 0.001) {
+                        js_action.Push("sound_offset", JsNumber{action.sound_offset});
+                    }
+
                     js_actions.Push(std::move(js_action));
                 }
 
@@ -343,11 +424,12 @@ void ScriptedSequence::Reset() {
     }
 }
 
-void ScriptedSequence::Update(const double cur_time_s) {
+void ScriptedSequence::Update(const double cur_time_s, bool playing) {
     for (Track &track : tracks_) {
         if (!track.active_count &&
-            (cur_time_s < track.time_beg || cur_time_s > track.time_end))
+            (cur_time_s < track.time_beg || cur_time_s > track.time_end)) {
             continue;
+        }
 
         for (int i = track.action_start; i < track.action_start + track.action_count;
              i++) {
@@ -360,7 +442,7 @@ void ScriptedSequence::Update(const double cur_time_s) {
                         action.is_active = false;
                         --track.active_count;
                     } else {
-                        UpdateAction(track.target_actor, action, cur_time_s);
+                        UpdateAction(track.target_actor, action, cur_time_s, playing);
                     }
                 } else {
                     if (cur_time_s <= action.time_end) {
@@ -368,7 +450,7 @@ void ScriptedSequence::Update(const double cur_time_s) {
                         action.is_active = true;
                         ++track.active_count;
 
-                        UpdateAction(track.target_actor, action, cur_time_s);
+                        UpdateAction(track.target_actor, action, cur_time_s, playing);
                     }
                 }
             }
@@ -377,22 +459,27 @@ void ScriptedSequence::Update(const double cur_time_s) {
 }
 
 void ScriptedSequence::UpdateAction(const uint32_t target_actor, SeqAction &action,
-                                    double time_cur_s) {
+                                    double time_cur_s, bool playing) {
     const SceneData &scene = scene_manager_.scene_data();
 
     auto *transforms = (Transform *)scene.comp_store[CompTransform]->Get(0);
     auto *drawables = (Drawable *)scene.comp_store[CompDrawable]->Get(0);
     auto *anim_states = (AnimState *)scene.comp_store[CompAnimState]->Get(0);
+    auto *sounds = (SoundSource *)scene.comp_store[CompSoundSource]->Get(0);
 
     assert(scene.comp_store[CompTransform]->IsSequential());
     assert(scene.comp_store[CompDrawable]->IsSequential());
     assert(scene.comp_store[CompAnimState]->IsSequential());
+    assert(scene.comp_store[CompSoundSource]->IsSequential());
 
     if (action.type == eActionType::Play) {
         SceneObject *actor_obj = scene_manager_.GetObject(target_actor);
 
         const float t = float(time_cur_s - action.time_beg);
         const float t_norm = t / float(action.time_end - action.time_beg);
+
+        const bool play_sound = playing || std::abs(t - last_t_) > 0.05;
+        last_t_ = t;
 
         uint32_t invalidate_mask = 0;
 
@@ -442,6 +529,30 @@ void ScriptedSequence::UpdateAction(const uint32_t target_actor, SeqAction &acti
             invalidate_mask |= CompDrawableBit;
         }
 
+        if ((actor_obj->comp_mask & CompSoundSourceBit) && action.sound_ref) {
+            const Transform &tr = transforms[actor_obj->components[CompTransform]];
+            SoundSource &ss = sounds[actor_obj->components[CompSoundSource]];
+
+            if (std::abs(t - action.sound_offset - ss.snd_src.GetOffset()) > 0.05f) {
+                ss.snd_src.SetOffset(t - float(action.sound_offset));
+            }
+
+            const Ren::Vec4f pos = tr.mat * Ren::Vec4f{0.0f, 0.0f, 0.0f, 1.0f};
+            ss.snd_src.set_position(Ren::ValuePtr(pos));
+
+            if (play_sound) {
+                if (t > action.sound_offset &&
+                    t < (action.sound_offset + action.sound_ref->GetDurationS()) &&
+                    (ss.snd_src.GetState() != Snd::eSrcState::Playing ||
+                     ss.snd_src.GetBuffer(0).index() != action.sound_ref.index())) {
+                    ss.snd_src.SetBuffer(action.sound_ref);
+                    ss.snd_src.Play();
+                }
+            } else {
+                ss.snd_src.Stop();
+            }
+        }
+
         scene_manager_.InvalidateObjects(&target_actor, 1, invalidate_mask);
 
         if (!action.caption.empty()) {
@@ -455,4 +566,78 @@ void ScriptedSequence::UpdateAction(const uint32_t target_actor, SeqAction &acti
         }
     } else if (action.type == eActionType::Look) {
     }
+}
+
+Ren::TextureRegionRef
+ScriptedSequence::RenderSoundWaveForm(const char *name, const void *samples_data,
+                                      int samples_count, const Snd::BufParams &params) {
+    const auto *samples_i8 = reinterpret_cast<const int8_t *>(samples_data);
+    const auto *samples_i16 = reinterpret_cast<const int16_t *>(samples_data);
+
+    const float duration_s = float(samples_count) / params.samples_per_sec;
+
+    const int tex_w = (int)std::ceil(100.0f * duration_s);
+    const int tex_h = 24;
+    const int tex_data_size = tex_w * tex_h * 4;
+
+    std::unique_ptr<uint8_t[]> tex_data(new uint8_t[tex_data_size]);
+    memset(&tex_data[0], 0x00, tex_data_size);
+    int tex_data_pos = 0;
+
+    for (int i = 0; i < samples_count;
+         i += int(params.samples_per_sec * SeqAction::SoundWaveStepS)) {
+        int min_val = std::numeric_limits<int>::max(),
+            max_val = std::numeric_limits<int>::lowest();
+
+        for (int j = 0;
+             j < std::min(int(params.samples_per_sec * SeqAction::SoundWaveStepS),
+                          samples_count - i);
+             j++) {
+            if (params.format == Snd::eBufFormat::Mono8) {
+                min_val = std::min(int(samples_i8[i + j]), min_val);
+                max_val = std::max(int(samples_i8[i + j]), max_val);
+            } else if (params.format == Snd::eBufFormat::Mono16) {
+                min_val = std::min(int(samples_i16[i + j]), min_val);
+                max_val = std::max(int(samples_i16[i + j]), max_val);
+            } else {
+                throw std::runtime_error("Unsupported format!");
+            }
+        }
+
+        if (params.format == Snd::eBufFormat::Mono8) {
+            min_val = (min_val - std::numeric_limits<int8_t>::lowest()) * tex_h /
+                      std::numeric_limits<uint8_t>::max();
+            max_val = (max_val - std::numeric_limits<int8_t>::lowest()) * tex_h /
+                      std::numeric_limits<uint8_t>::max();
+        } else if (params.format == Snd::eBufFormat::Mono16) {
+            min_val = (min_val - std::numeric_limits<int16_t>::lowest()) * tex_h /
+                      std::numeric_limits<uint16_t>::max();
+            max_val = (max_val - std::numeric_limits<int16_t>::lowest()) * tex_h /
+                      std::numeric_limits<uint16_t>::max();
+        } else {
+            throw std::runtime_error("Unsupported format!");
+        }
+
+        for (int j = 0; j < tex_h; j++) {
+            if (j >= min_val && j < max_val) {
+                const int k = 4 * (j * tex_w + tex_data_pos);
+                tex_data[k + 0] = tex_data[k + 1] = 0;
+                tex_data[k + 2] = 50;
+                tex_data[k + 3] = 255;
+            }
+        }
+        tex_data_pos++;
+    }
+
+    Ren::Texture2DParams p;
+    p.w = tex_w;
+    p.h = tex_h;
+    p.format = Ren::eTexFormat::RawRGBA8888;
+
+    Ren::eTexLoadStatus status;
+    Ren::TextureRegionRef ret =
+        ren_ctx_.LoadTextureRegion(name, &tex_data[0], tex_data_size, p, &status);
+    assert(status == Ren::eTexLoadStatus::TexCreatedFromData);
+
+    return ret;
 }

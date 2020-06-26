@@ -9,9 +9,10 @@
 				{
 					"type" : "play", 
 					"time_beg" : 0, 
-					"time_end" : 4, 
+					"time_end" : 3, 
 					"anim" : "eric_idle.anim", 
-					"caption" : "Ja, Euer Ehren. Ich bin ein bisschen besorgt."
+					"caption" : "Ja, Euer Ehren. Ich bin ein bisschen besorgt.",
+					"sound" : "lawyer/04_noexp.wav"
 				}
 			]
 		},
@@ -22,17 +23,27 @@
 			"actions" : [
 				{
 					"type" : "play", 
-					"time_beg" : 4.5, 
-					"time_end" : 9.0, 
+					"time_beg" : 3.5, 
+					"time_end" : 7.0, 
 					"anim" : "eric_idle.anim", 
-					"caption" : "Das Schicksal Ihres Mandanten hängt allein von Ihrer Verhandlungsführung ab."
+					"caption" : "Das Schicksal Ihres Mandanten hängt allein von Ihrer Verhandlungsführung ab.",
+					"sound" : "judge/02_important.wav"
 				},
 				{
 					"type" : "play", 
-					"time_beg" : 9.5, 
-					"time_end" : 14.0, 
+					"time_beg" : 7.5, 
+					"time_end" : 9.0, 
 					"anim" : "eric_idle.anim", 
-					"caption" : "Mord ist eine ernste Sache. Ich hoffe für Ihren Mandanten, dass Sie die Nerven behalten."
+					"caption" : "Mord ist eine ernste Sache.",
+					"sound" : "judge/03_serious.wav"
+				},
+				{
+					"type" : "play", 
+					"time_beg" : 9.0, 
+					"time_end" : 12.0, 
+					"anim" : "eric_idle.anim", 
+					"caption" : "Ich hoffe für Ihren Mandanten, dass Sie die Nerven behalten.",
+					"sound" : "judge/04_nerves.wav"
 				}
 			]
 		},
@@ -50,7 +61,7 @@
 		}
 	],
     "ending" : {
-        "time_point" : 14.5, 
+        "time_point" : 12.5, 
 		"choices" : [
 			{
 				"key" : "pass", 

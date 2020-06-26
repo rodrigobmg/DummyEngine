@@ -9,9 +9,10 @@
 				{
 					"type" : "play", 
 					"time_beg" : 0, 
-					"time_end" : 4, 
+					"time_end" : 3, 
 					"anim" : "eric_idle.anim", 
-					"caption" : "Das Gericht befasst sich nun mit dem Verfahren gegen Hr. Smiths."
+					"caption" : "Das Gericht befasst sich nun mit dem Verfahren gegen Hr. Smiths.",
+					"sound" : "judge/01_trial_start.wav"
 				}
 			]
 		}, 
@@ -22,10 +23,11 @@
 			"actions" : [
 				{
 					"type" : "play", 
-					"time_beg" : 4.1, 
-					"time_end" : 7, 
+					"time_beg" : 3.1, 
+					"time_end" : 5, 
 					"anim" : "eric_idle.anim", 
-					"caption" : "Die Anklage ist bereit, Euer Ehren."
+					"caption" : "Die Anklage ist bereit, Euer Ehren.",
+					"sound" : "prosecutor/01_ready.wav"
 				}
 			]
 		}, 
@@ -43,7 +45,7 @@
 		}
 	], 
 	"ending" : {
-		"time_point" : 7.5, 
+		"time_point" : 5.5, 
 		"choices" : [
 			{
 				"key" : "pass", 

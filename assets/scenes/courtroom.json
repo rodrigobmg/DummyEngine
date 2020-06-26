@@ -919,7 +919,10 @@
                 "anims" : [
                 ]
             },
-            "anim_state" : {}
+            "anim_state" : {},
+            "sound" : {
+                "offset" : [ 0.0, 0.0, 0.0 ]
+            } 
         },
 		{
             "name" : "lawyer",
@@ -1026,7 +1029,10 @@
 					}
 				]
             },
-            "anim_state" : {}
+            "anim_state" : {},
+            "sound" : {
+                "offset" : [ 0.0, 0.0, 0.0 ]
+            }
         },
         {
             "name" : "assist",
@@ -1231,7 +1237,10 @@
                 "anims" : [
                 ]
             },
-            "anim_state" : {}
+            "anim_state" : {},
+            "sound" : {
+                "offset" : [ 0.0, 0.0, 0.0 ]
+            } 
         },
 		{
 			"transform" : {

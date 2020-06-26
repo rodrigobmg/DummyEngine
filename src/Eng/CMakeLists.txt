@@ -178,6 +178,8 @@ set(SCENE_COMP_SOURCES
         Scene/Comp/LightSource.cpp
         Scene/Comp/Occluder.h
         Scene/Comp/Occluder.cpp
+        Scene/Comp/SoundSource.h
+        Scene/Comp/SoundSource.cpp
         Scene/Comp/Transform.h
         Scene/Comp/Transform.cpp
         Scene/Comp/VegState.h

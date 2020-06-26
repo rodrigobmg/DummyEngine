@@ -14,17 +14,32 @@ if(WIN32)
 		set(LIBS OpenAL32)
 	endif()
 else(WIN32)
-    
+    if(${SOUND} STREQUAL "AL")
+	    include(FindPkgConfig)
+        pkg_search_module (OPENAL REQUIRED openal)
+	    
+		set(LIBS openal)
+	endif()
 endif(WIN32)
 
-set(SOURCE_FILES Context.h
+set(SOURCE_FILES Buffer.h
+				 Context.h
                  Context.cpp
-                 Log.h)
+				 HashMap32.h
+                 Log.h
+				 Source.h
+				 SparseArray.h
+				 Storage.h
+				 String.h
+				 Utils.h
+				 Utils.cpp)
 
 if(${SOUND} STREQUAL "AL")
 	add_definitions(-DUSE_AL_SOUND)
     set(SOURCE_FILES ${SOURCE_FILES}
-                     ContextAL.cpp)
+					 BufferAL.cpp
+                     ContextAL.cpp
+					 SourceAL.cpp)
 endif()
 
 list(APPEND ALL_SOURCE_FILES ${SOURCE_FILES})
