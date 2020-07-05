@@ -39,7 +39,7 @@ const char SCENE_NAME[] = "assets_pc/scenes/"
 #endif
                           "courtroom.json";
 
-const char SEQ_NAME[] = "test/test_dialog/0_intro.json";
+const char SEQ_NAME[] = "test/test_dialog/0_begin.json";
 //const char SEQ_NAME[] = "test/test_seq.json";
 } // namespace GSUITest4Internal
 
@@ -473,7 +473,8 @@ bool GSUITest4::HandleInput(const InputManager::Event &evt) {
             Viewer::PrepareAssets("pc");
             LoadDialog(SEQ_NAME);
         } else if (evt.key_code == KeyF6) {
-            SaveSequence(SEQ_NAME);
+            const ScriptedSequence *cur_seq = dial_ctrl_->GetCurSequence();
+            SaveSequence(cur_seq->lookup_name());
         } else {
             input_processed = false;
         }

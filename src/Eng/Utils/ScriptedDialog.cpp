@@ -6,7 +6,12 @@ ScriptedDialog::ScriptedDialog(Ren::Context &ren_ctx, Snd::Context &snd_ctx,
                                SceneManager &scene_manager)
     : ren_ctx_(ren_ctx), snd_ctx_(snd_ctx), scene_manager_(scene_manager) {}
 
-void ScriptedDialog::Clear() { sequences_.clear(); }
+void ScriptedDialog::Clear() {
+    for (ScriptedSequence &seq : sequences_) {
+        seq.Reset();
+    }
+    sequences_.clear();
+}
 
 bool ScriptedDialog::Load(const char *lookup_name, const JsObject &js_seq,
                           bool (*read_sequence)(const char *name, JsObject &js_seq)) {
@@ -37,7 +42,7 @@ bool ScriptedDialog::Load(const char *lookup_name, const JsObject &js_seq,
                     JsObject js_next_seq;
                     if (!read_sequence(js_seq_name.val.c_str(), js_next_seq)) {
                         ren_ctx_.log()->Error("Failed to read sequence %s",
-                                          js_seq_name.val.c_str());
+                                              js_seq_name.val.c_str());
                         return false;
                     }
 
@@ -45,7 +50,7 @@ bool ScriptedDialog::Load(const char *lookup_name, const JsObject &js_seq,
 
                     if (!Load(js_seq_name.val.c_str(), js_next_seq, read_sequence)) {
                         ren_ctx_.log()->Error("Failed to load choise %s",
-                                          js_choice_key.val.c_str());
+                                              js_choice_key.val.c_str());
                         return false;
                     }
                 }

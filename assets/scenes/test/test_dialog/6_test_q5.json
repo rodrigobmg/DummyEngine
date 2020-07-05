@@ -9,16 +9,18 @@
 				{
 					"type" : "play", 
 					"time_beg" : 0.0, 
-					"time_end" : 1.5, 
+					"time_end" : 0.8, 
 					"anim" : "eric_idle.anim", 
-					"caption" : "Richtig."
+					"caption" : "Richtig.",
+                    "sound" : "judge/23_right.wav"
 				},
                 {
 					"type" : "play", 
-					"time_beg" : 1.6, 
-					"time_end" : 5.0, 
+					"time_beg" : 0.9, 
+					"time_end" : 3.6, 
 					"anim" : "eric_idle.anim", 
-					"caption" : "Aber warum kamen dann die Ärzte zur Szene?"
+					"caption" : "Aber warum kamen dann die Ärzte zur Szene?",
+                    "sound" : "judge/24_why_came.wav"
 				}
 			]
 		}, 
@@ -45,7 +47,7 @@
 		}
 	], 
 	"ending" : {
-		"time_point" : 5.5,
+		"time_point" : 5.0,
         "choices" : [
 			{
 				"key" : "bracelet",

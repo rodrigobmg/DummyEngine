@@ -79,6 +79,18 @@ void SeqCanvasUI::Draw(Gui::Renderer *r) {
                 const float x_beg = GetPointFromTime((float)seq_action->time_beg);
                 const float x_end = GetPointFromTime((float)seq_action->time_end);
 
+                // text clip area in relative coordinates
+                Ren::Vec2f text_clip[2] = {
+                    SnapToPixels(
+                        Ren::Vec2f{x_beg + crop_region_width, y_coord + border_height}),
+                    Ren::Vec2f{x_end - x_beg - 2.0f * crop_region_width,
+                               track_height - 2.0f * border_height}};
+                // convert to absolute coordinates
+                text_clip[0] = pos() + 0.5f * (text_clip[0] + Ren::Vec2f(1, 1)) * size();
+                text_clip[1] = 0.5f * text_clip[1] * size();
+
+                r->PushClipArea(text_clip);
+
                 Gui::Image9Patch *el =
                     (track == selected_index_[0] && action == selected_index_[1])
                         ? &element_highlighted_
@@ -98,10 +110,11 @@ void SeqCanvasUI::Draw(Gui::Renderer *r) {
                     const float x_end_sound = GetPointFromTime(
                         float(seq_action->time_beg + seq_action->sound_offset) +
                         SeqAction::SoundWaveStepS * float(p.w));
-                    el->Resize(SnapToPixels(Ren::Vec2f{x_beg_sound, y_coord + border_height}),
-                               Ren::Vec2f{x_end_sound - x_beg_sound,
-                                          track_height - 2.0f * border_height},
-                               this);
+                    el->Resize(
+                        SnapToPixels(Ren::Vec2f{x_beg_sound, y_coord + border_height}),
+                        Ren::Vec2f{x_end_sound - x_beg_sound,
+                                   track_height - 2.0f * border_height},
+                        this);
 
                     const Ren::Vec2f pos[2] = {el->dims()[0],
                                                el->dims()[0] + el->dims()[1]};
@@ -109,18 +122,6 @@ void SeqCanvasUI::Draw(Gui::Renderer *r) {
                     r->PushImageQuad(Gui::eDrawMode::DrPassthrough, tex_layer, pos,
                                      uvs_px);
                 }
-
-                // text clip area in relative coordinates
-                Ren::Vec2f text_clip[2] = {
-                    SnapToPixels(
-                        Ren::Vec2f{x_beg + crop_region_width, y_coord + border_height}),
-                    Ren::Vec2f{x_end - x_beg - 2.0f * crop_region_width,
-                               track_height - 2.0f * border_height}};
-                // convert to absolute coordinates
-                text_clip[0] = pos() + 0.5f * (text_clip[0] + Ren::Vec2f(1, 1)) * size();
-                text_clip[1] = 0.5f * text_clip[1] * size();
-
-                r->PushClipArea(text_clip);
 
                 const char *type_name =
                     ScriptedSequence::ActionTypeNames[(int)seq_action->type];

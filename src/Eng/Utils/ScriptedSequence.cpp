@@ -216,6 +216,10 @@ bool ScriptedSequence::Load(const char *lookup_name, const JsObject &js_seq) {
                         params.format = Snd::eBufFormat::Stereo16;
                     }*/
                     else {
+                        ren_ctx_.log()->Error("Unsupported sound format in file %s (%i "
+                                              "channels, %i bits per sample)",
+                                              sound_path.c_str(), channels,
+                                              bits_per_sample);
                         return false;
                     }
                     params.samples_per_sec = samples_per_sec;
@@ -226,8 +230,11 @@ bool ScriptedSequence::Load(const char *lookup_name, const JsObject &js_seq) {
                     action.sound_ref = {};
                     action.sound_ref =
                         snd_ctx_.LoadBuffer(name, &samples[0], size, params, &status);
-                    assert(status == Snd::eBufLoadStatus::CreatedFromData);
+                    assert(status == Snd::eBufLoadStatus::Found ||
+                           status == Snd::eBufLoadStatus::CreatedFromData);
 
+                    assert(!action.sound_wave_tex ||
+                           action.sound_wave_tex->ref_count() == 1);
                     action.sound_wave_tex = {};
                     action.sound_wave_tex =
                         RenderSoundWaveForm(name, &samples[0], samples_count, params);
@@ -344,7 +351,7 @@ void ScriptedSequence::Save(JsObject &js_seq) {
                         js_action.Push("caption", JsString{action.caption});
                     }
 
-                    if (!action.sound_ref) {
+                    if (action.sound_ref) {
                         js_action.Push("sound",
                                        JsString{action.sound_ref->name().c_str()});
                     }
@@ -395,9 +402,11 @@ void ScriptedSequence::Reset() {
 
     // auto *transforms = (Transform *)scene.comp_store[CompTransform]->Get(0);
     auto *drawables = (Drawable *)scene.comp_store[CompDrawable]->Get(0);
+    auto *sounds = (SoundSource *)scene.comp_store[CompSoundSource]->Get(0);
 
     assert(scene.comp_store[CompTransform]->IsSequential());
     assert(scene.comp_store[CompDrawable]->IsSequential());
+    assert(scene.comp_store[CompSoundSource]->IsSequential());
 
     for (Track &track : tracks_) {
         track.active_count = 0;
@@ -410,12 +419,20 @@ void ScriptedSequence::Reset() {
             SeqAction &action = actions_[i];
 
             action.is_active = false;
-            if (track.target_actor != 0xffffffff && action.anim_ref) {
+            if (track.target_actor != 0xffffffff) {
                 SceneObject *actor = scene_manager_.GetObject(track.target_actor);
-                Drawable &target_drawable = drawables[actor->components[CompDrawable]];
-                Ren::Mesh *target_mesh = target_drawable.mesh.get();
-                Ren::Skeleton *target_skel = target_mesh->skel();
-                action.anim_id = target_skel->AddAnimSequence(action.anim_ref);
+                Drawable &dr = drawables[actor->components[CompDrawable]];
+
+                if (action.anim_ref) {
+                    Ren::Mesh *target_mesh = dr.mesh.get();
+                    Ren::Skeleton *target_skel = target_mesh->skel();
+                    action.anim_id = target_skel->AddAnimSequence(action.anim_ref);
+                }
+
+                if (actor->comp_mask & CompSoundSourceBit) {
+                    SoundSource &ss = sounds[actor->components[CompSoundSource]];
+                    ss.snd_src.ResetBuffers();
+                }
             }
 
             track.time_beg = std::min(track.time_beg, action.time_beg);
@@ -542,11 +559,19 @@ void ScriptedSequence::UpdateAction(const uint32_t target_actor, SeqAction &acti
 
             if (play_sound) {
                 if (t > action.sound_offset &&
-                    t < (action.sound_offset + action.sound_ref->GetDurationS()) &&
-                    (ss.snd_src.GetState() != Snd::eSrcState::Playing ||
-                     ss.snd_src.GetBuffer(0).index() != action.sound_ref.index())) {
-                    ss.snd_src.SetBuffer(action.sound_ref);
-                    ss.snd_src.Play();
+                    t < (action.sound_offset + action.sound_ref->GetDurationS())) {
+
+                    if (ss.snd_src.GetState() != Snd::eSrcState::Playing ||
+                        ss.snd_src.GetBuffer(0).index() != action.sound_ref.index()) {
+                        ss.snd_src.SetOffset(t - float(action.sound_offset));
+                        ss.snd_src.Stop();
+                        ss.snd_src.SetBuffer(action.sound_ref);
+                        ss.snd_src.Play();
+                    }
+                } else {
+                    if (ss.snd_src.GetBuffer(0).index() != action.sound_ref.index()) {
+                        ss.snd_src.ResetBuffers();
+                    }
                 }
             } else {
                 ss.snd_src.Stop();
@@ -576,8 +601,8 @@ ScriptedSequence::RenderSoundWaveForm(const char *name, const void *samples_data
 
     const float duration_s = float(samples_count) / params.samples_per_sec;
 
-    const int tex_w = (int)std::ceil(100.0f * duration_s);
-    const int tex_h = 24;
+    const int tex_w = (int)std::ceil(duration_s / SeqAction::SoundWaveStepS);
+    const int tex_h = 16;
     const int tex_data_size = tex_w * tex_h * 4;
 
     std::unique_ptr<uint8_t[]> tex_data(new uint8_t[tex_data_size]);
@@ -637,7 +662,8 @@ ScriptedSequence::RenderSoundWaveForm(const char *name, const void *samples_data
     Ren::eTexLoadStatus status;
     Ren::TextureRegionRef ret =
         ren_ctx_.LoadTextureRegion(name, &tex_data[0], tex_data_size, p, &status);
-    assert(status == Ren::eTexLoadStatus::TexCreatedFromData);
+    assert(status == Ren::eTexLoadStatus::TexFound ||
+           status == Ren::eTexLoadStatus::TexCreatedFromData);
 
     return ret;
 }

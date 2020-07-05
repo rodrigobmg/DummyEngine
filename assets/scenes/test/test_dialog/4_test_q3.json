@@ -9,23 +9,18 @@
 				{
 					"type" : "play", 
 					"time_beg" : 0.0, 
-					"time_end" : 1.5, 
+					"time_end" : 1.0, 
 					"anim" : "eric_idle.anim", 
-					"caption" : "Korrekt."
+					"caption" : "Korrekt.",
+                    "sound" : "judge/11_correct.wav"
 				},
                 {
 					"type" : "play", 
-					"time_beg" : 2.0, 
-					"time_end" : 4.5, 
+					"time_beg" : 1.5, 
+					"time_end" : 6.1, 
 					"anim" : "eric_idle.anim", 
-					"caption" : "Sagen Sie mir jetzt, was die Todesursache war."
-				},
-                {
-					"type" : "play", 
-					"time_beg" : 4.6, 
-					"time_end" : 6.6, 
-					"anim" : "eric_idle.anim", 
-					"caption" : "Sie starb, weil sie...?"
+					"caption" : "Sagen Sie mir jetzt, was die Todesursache war. Sie starb, weil sie...?",
+                    "sound" : "judge/20_weapon.wav"
 				}
 			]
 		}, 
@@ -52,7 +47,7 @@
 		}
 	], 
 	"ending" : {
-		"time_point" : 7.0,
+		"time_point" : 6.5,
         "choices" : [
 			{
 				"key" : "poisoned",

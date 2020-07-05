@@ -23,7 +23,6 @@ class Source {
     BufferRef buf_refs_[MaxQueuedBuffers];
     int bufs_count_ = 0;
 
-    void ResetBuffers();
   public:
     Source() = default;
     ~Source();
@@ -49,6 +48,7 @@ class Source {
 
     float GetOffset();
     void SetOffset(float offset_s);
+    void ResetBuffers();
 
     bool looping() const { return looping_; }
     float pitch() const { return pitch_; }

@@ -88,6 +88,7 @@ void Snd::Source::ResetBuffers() {
     for (int i = 0; i < bufs_count_; i++) {
         buf_refs_[i] = {};
     }
+    bufs_count_ = 0;
 }
 
 Snd::eSrcState Snd::Source::GetState() const {

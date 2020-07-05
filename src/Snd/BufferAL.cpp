@@ -32,19 +32,19 @@ void Snd::Buffer::FreeBuf() {
 Snd::Buffer::~Buffer() { FreeBuf(); }
 
 Snd::Buffer::Buffer(Buffer &&rhs) noexcept {
-    name_ = std::move(rhs.name_);
-    buf_id_ = rhs.buf_id_;
-    rhs.buf_id_ = 0xffffffff;
-    params_ = rhs.params_;
-    rhs.params_ = {};
+    *this = std::move(rhs);
 }
 
 Snd::Buffer &Snd::Buffer::operator=(Buffer &&rhs) noexcept {
+    RefCounter::operator=(std::move((RefCounter&)rhs));
+
     FreeBuf();
 
     name_ = std::move(rhs.name_);
     buf_id_ = rhs.buf_id_;
     rhs.buf_id_ = 0xffffffff;
+    size_ = rhs.size_;
+    rhs.size_ = 0;
     params_ = rhs.params_;
     rhs.params_ = {};
 
