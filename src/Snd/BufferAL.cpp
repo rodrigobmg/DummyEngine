@@ -16,9 +16,7 @@ static_assert(sizeof(g_bytes_per_sample) / sizeof(g_bytes_per_sample[0]) ==
 Snd::Buffer::Buffer(const char *name, const void *data, uint32_t size,
                     const BufParams &params, eBufLoadStatus *load_status, ILog *log)
     : name_(name), size_(size) {
-    if (data) {
-        Init(data, size_, params, load_status, log);
-    }
+    Init(data, size_, params, load_status, log);
 }
 
 void Snd::Buffer::FreeBuf() {
@@ -59,10 +57,16 @@ void Snd::Buffer::Init(const void *data, uint32_t size, const BufParams &params,
         buf_id_ = (uint32_t)buf_id;
     }
 
-    SetData(data, size, params);
+    if (data) {
+        SetData(data, size, params);
 
-    if (load_status) {
-        (*load_status) = eBufLoadStatus::CreatedFromData;
+        if (load_status) {
+            (*load_status) = eBufLoadStatus::CreatedFromData;
+        }
+    } else {
+        if (load_status) {
+            (*load_status) = eBufLoadStatus::CreatedDefault;
+        }
     }
 }
 

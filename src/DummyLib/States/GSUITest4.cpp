@@ -144,6 +144,8 @@ void GSUITest4::LoadDialog(const char *seq_name) {
     dial_ctrl_->SetDialog(test_dialog_.get());
     dialog_edit_ui_->set_dialog(test_dialog_.get());
     seq_edit_ui_->set_sequence(dial_ctrl_->GetCurSequence());
+
+    use_free_cam_ = false;
 }
 
 bool GSUITest4::SaveSequence(const char *seq_name) {
@@ -276,19 +278,17 @@ void GSUITest4::OnUpdateScene() {
 
     GSBaseState::OnUpdateScene();
 
-    const float delta_time_s = fr_info_.delta_time_us * 0.000001f;
-
-    scene_manager_->SetupView(
-        cam_ctrl_->view_origin, (cam_ctrl_->view_origin + cam_ctrl_->view_dir),
-        Ren::Vec3f{0.0f, 1.0f, 0.0f}, cam_ctrl_->view_fov, cam_ctrl_->max_exposure);
-
-    const SceneData &scene = scene_manager_->scene_data();
-
     seq_cap_ui_->Clear();
     dialog_ui_->Clear();
 
     if (dial_ctrl_) {
         dial_ctrl_->Update(Sys::GetTimeS());
+    }
+
+    if (use_free_cam_) {
+        scene_manager_->SetupView(
+            cam_ctrl_->view_origin, (cam_ctrl_->view_origin + cam_ctrl_->view_dir),
+            Ren::Vec3f{ 0.0f, 1.0f, 0.0f }, cam_ctrl_->view_fov, cam_ctrl_->max_exposure);
     }
 }
 

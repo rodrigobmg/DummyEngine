@@ -172,7 +172,9 @@
 						0, 
 						0, 
 						0
-					]
+					],
+					"anim" : "cam_test.anim",
+					"dof" : true
 				}
 			]
 		}

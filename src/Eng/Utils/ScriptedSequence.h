@@ -32,6 +32,7 @@ struct SeqAction {
     Ren::AnimSeqRef anim_ref;
     int anim_id;
     Snd::BufferRef sound_ref;
+    bool dof;
 
     static constexpr float SoundWaveStepS = 0.02f;
     Ren::TextureRegionRef sound_wave_tex;

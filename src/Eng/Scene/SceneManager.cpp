@@ -84,6 +84,8 @@ template <typename T> class DefaultCompStorage : public CompStorage {
 
     bool IsSequential() const override { return true; }
 };
+
+#include "__cam_rig.inl"
 } // namespace SceneManagerInternal
 
 SceneManager::SceneManager(Ren::Context &ren_ctx, Snd::Context &snd_ctx,
@@ -160,6 +162,18 @@ SceneManager::SceneManager(Ren::Context &ren_ctx, Snd::Context &snd_ctx,
             CompSoundSource, default_comp_storage_[CompSoundSource].get(),
             std::bind(&SceneManager::PostloadSoundSource, this, _1, _2, _3));
     }
+
+    Sys::MemBuf buf{__cam_rig_mesh, __cam_rig_mesh_size};
+    std::istream in_mesh(&buf);
+
+    Ren::eMeshLoadStatus status;
+    cam_rig_ = ren_ctx.LoadMesh(
+        "__cam_rig", &in_mesh,
+        [this](const char *name) -> Ren::MaterialRef {
+            return ren_ctx_.LoadMaterial(name, nullptr, nullptr, nullptr, nullptr);
+        },
+        &status);
+    assert(status == Ren::MeshCreatedFromData);
 }
 
 SceneManager::~SceneManager() { ClearScene(); }

@@ -33,6 +33,8 @@ class SceneManager : public std::enable_shared_from_this<SceneManager> {
     SceneManager(const SceneManager &rhs) = delete;
 
     const Ren::Camera &main_cam() const { return cam_; }
+    Ren::Camera &main_cam() { return cam_; }
+    Ren::Mesh *cam_rig() { return cam_rig_.get(); }
     SceneData &scene_data() { return scene_data_; }
     bool load_complete() const { return scene_texture_load_counter_ == 0; }
 
@@ -117,6 +119,7 @@ class SceneManager : public std::enable_shared_from_this<SceneManager> {
 
     Ren::Context &ren_ctx_;
     Snd::Context &snd_ctx_;
+    Ren::MeshRef cam_rig_;
     Ray::RendererBase &ray_renderer_;
     Sys::ThreadPool &threads_;
     std::vector<Ray::RegionContext> ray_reg_ctx_;

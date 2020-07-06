@@ -15,7 +15,7 @@ struct BufParams {
     uint32_t samples_per_sec = 0;
 };
 
-enum class eBufLoadStatus { Found, CreatedFromData };
+enum class eBufLoadStatus { Found, CreatedDefault, CreatedFromData };
 
 class Buffer : public RefCounter {
     String name_;
