@@ -107,10 +107,17 @@ SceneManager::SceneManager(Ren::Context &ren_ctx, ShaderLoader &sh, Snd::Context
             Ren::eTexFilter::Trilinear, ren_ctx_.log()};
     }
 
-    { // Create splitter for lightmap atlas
+    { // Init lightmap atlas
+        const Ren::eTexFormat formats[] = {Ren::eTexFormat::Compressed,
+                                           Ren::eTexFormat::Undefined};
+        const uint32_t flags[] = {0};
+        scene_data_.lm_atlas = Ren::TextureAtlasArray(
+            LIGHTMAP_ATLAS_RESX, LIGHTMAP_ATLAS_RESY, 4, Ren::eTexFormat::Compressed,
+            Ren::eTexFilter::Trilinear);
+        scene_data_.env.lm_atlas = &scene_data_.lm_atlas;
+
         scene_data_.lm_splitter =
-            Ren::TextureSplitter(SceneManagerConstants::LIGHTMAP_ATLAS_RESX,
-                                 SceneManagerConstants::LIGHTMAP_ATLAS_RESY);
+            Ren::TextureSplitter(LIGHTMAP_ATLAS_RESX, LIGHTMAP_ATLAS_RESY);
     }
 
     { // Allocate cubemap array
@@ -236,6 +243,17 @@ void SceneManager::LoadScene(const JsObject &js_scene) {
 
             scene_data_.env.lm_indir_sh[sh_l] =
                 OnLoadTexture(lm_indir_sh_tex_name.c_str(), 0);
+
+            /*Sys::AssetFile in_file(lm_indir_sh_tex_name);
+            const size_t in_file_size = in_file.size();
+
+            std::unique_ptr<uint8_t[]> in_tex_data(new uint8_t[in_file_size]);
+            in_file.Read((char *)&in_tex_data[0], in_file_size);
+
+            const int pos[] = {0, 0};
+            const int res[] = {LIGHTMAP_ATLAS_RESX, LIGHTMAP_ATLAS_RESY};
+            scene_data_.lm_atlas.InitRegion(&in_tex_data[0], in_file_size,
+                                            Ren::eTexFormat::Compressed, 0, sh_l, 0)*/
         }
     }
 

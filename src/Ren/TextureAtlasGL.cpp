@@ -156,7 +156,7 @@ void Ren::TextureAtlas::InitRegion(const void *data, const int data_len,
 #ifndef NDEBUG
     if (level == 0) {
         int _res[2];
-        int rc = splitter_.FindNode(pos, _res);
+        const int rc = splitter_.FindNode(pos, _res);
         assert(rc != -1);
         assert(_res[0] == res[0] && _res[1] == res[1]);
     }

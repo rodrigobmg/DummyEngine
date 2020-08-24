@@ -78,17 +78,18 @@ static_assert(sizeof(bvh_node_t) == 48, "!");
 const int MAX_STACK_SIZE = 64;
 
 struct Environment {
-    Ren::Vec3f          sun_dir, sun_col;
-    float               sun_softness = 0.0f;
-    Ren::Vec3f          wind_vec;
-    float               wind_turbulence = 0.0f;
-    Ren::Vec2f          wind_scroll_lf, wind_scroll_hf;
-    Ren::Texture2DRef   env_map;
-    Ren::Texture2DRef   lm_direct, lm_indir,
-                        lm_indir_sh[4];
-    float               sun_shadow_bias[2] = { 4.0f, 8.0f };
+    Ren::Vec3f              sun_dir, sun_col;
+    float                   sun_softness = 0.0f;
+    Ren::Vec3f              wind_vec;
+    float                   wind_turbulence = 0.0f;
+    Ren::Vec2f              wind_scroll_lf, wind_scroll_hf;
+    Ren::Texture2DRef       env_map;
+    Ren::Texture2DRef       lm_direct, lm_indir,
+                            lm_indir_sh[4];
+    Ren::TextureAtlasArray  *lm_atlas;
+    float                   sun_shadow_bias[2] = { 4.0f, 8.0f };
 
-    Ren::String         env_map_name, env_map_name_pt;
+    Ren::String             env_map_name, env_map_name_pt;
 };
 
 struct BBox {
@@ -121,6 +122,7 @@ struct SceneData {
     Environment                             env;
     Ren::HashMap32<Ren::String, Ren::Vec4f> decals_textures;
     Ren::TextureAtlas                       decals_atlas;
+    Ren::TextureAtlasArray                  lm_atlas;
     Ren::TextureSplitter                    lm_splitter;
     ProbeStorage                            probe_storage;
 

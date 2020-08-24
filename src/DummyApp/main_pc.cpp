@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
 // fix exposure flicker
 // use texture array for lightmaps
 // texture streaming
-// use stencil to distinguich ssr/nossr regions <-- msaa :(
+// use stencil to distinguish ssr/nossr regions <-- msaa :(
 // use GL_EXT_shader_group_vote
 // refactor msaa (resolve once, remove permutations)
 // refactor file read on android
