@@ -390,6 +390,44 @@ mat3 CotangentFrame_Precise(vec3 normal, vec3 position, vec2 uv) {
     return mat3(T, B, N);
 }
 
+float NormalmapShadow(highp vec3 light_dir, highp vec2 uvs, highp float lighting) {
+    const float HeightScale = 4.0;
+    
+    const float SampleCount = 256.0;
+    const float InvSampleCount = 1.0 / SampleCount;
+    const float Step = InvSampleCount;
+    
+    float shadow = 0.0;
+    
+    light_dir.xy *= vec2(1.0, -1.0) * HeightScale;
+    
+    float slope = -lighting;
+    float max_slope = 0.0;
+    float pos = Step;
+    float inv_samplecountplusone = 1.0 + InvSampleCount;
+    while (pos <= 1.0) {
+        vec3 tmp_normal = texture(normals_texture, uvs + light_dir.xy * pos * 0.02).wyz;
+        tmp_normal = tmp_normal * 2.0 - 1.0;
+        
+        float tmp_lighting = dot(normalize(vec3(light_dir.x, -light_dir.y, light_dir.z)), tmp_normal);
+        float shadowed = -tmp_lighting;
+        
+        slope += shadowed;
+        
+        if (slope > max_slope) {
+            shadow += inv_samplecountplusone - pos;
+        }
+        max_slope = max(max_slope, slope);
+        
+        pos += Step;
+    }
+    
+    float hardness = HeightScale * 10.0;
+    shadow = clamp(1.0 - shadow * InvSampleCount * hardness, 0.0, 1.0);
+    
+    return shadow;
+}
+
 void main(void) {
     highp float lin_depth = LinearizeDepth(gl_FragCoord.z, shrd_data.uClipInfo);
     highp float k = log2(lin_depth / shrd_data.uClipInfo[1]) / shrd_data.uClipInfo[3];
@@ -418,7 +456,7 @@ void main(void) {
     
     vec2 modified_uvs;
     
-    const float ParallaxDepth = 0.25;//0.008;
+    const float ParallaxDepth = 0.008;//0.25;//0.008;
     
     float iterations = 0.0;
     vec3 _view_ray_ts = normalize(vec3(-view_ray_ts.xy, view_ray_ts.z / ParallaxDepth));
@@ -589,11 +627,26 @@ void main(void) {
     indirect_col /= max(total_fade, 1.0);
     indirect_col = max(indirect_col, vec3(0.0));
     
-    float lambert = clamp(dot(normal, shrd_data.uSunDir.xyz), 0.0, 1.0);
+    float N_dot_L = dot(normal, shrd_data.uSunDir.xyz);
+    float lambert = clamp(N_dot_L, 0.0, 1.0);
     float visibility = 0.0;
     if (lambert > 0.00001) {
         visibility = GetSunVisibility(lin_depth, shadow_texture, aVertexShUVs_);
     }
+    
+    vec3 light_dir_ts = shrd_data.uSunDir.xyz * basis;
+    //light_dir_ts.y = -light_dir_ts.y;
+
+    vec3 _norm = normal_color * 2.0 - 1.0;
+    //lambert = clamp(dot(_norm, light_dir_ts), 0.0, 1.0);
+    //visibility = 1.0;
+    
+    light_dir_ts.y = -light_dir_ts.y;
+    visibility *= NormalmapShadow(light_dir_ts, modified_uvs, lambert);
+    
+    
+    
+    //albedo_color = vec3(0.7, 0.7, 0.7);
     
     vec2 ao_uvs = vec2(ix, iy) / shrd_data.uResAndFRes.zw;
     float ambient_occlusion = textureLod(ao_texture, ao_uvs, 0.0).r;
