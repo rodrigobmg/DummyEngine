@@ -1760,9 +1760,9 @@ Ren::ProgramRef ModlApp::OnProgramNeeded(const char *name, const char *vs_shader
 
         Ren::eShaderLoadStatus sh_status;
         Ren::ShaderRef vs_ref = ctx_.LoadShaderGLSL(vs_shader, vs_src.c_str(), Ren::eShaderType::Vert, &sh_status);
-        assert(sh_status == Ren::eShaderLoadStatus::CreatedFromData);
+        assert(sh_status == Ren::eShaderLoadStatus::Found || sh_status == Ren::eShaderLoadStatus::CreatedFromData);
         Ren::ShaderRef fs_ref = ctx_.LoadShaderGLSL(fs_shader, fs_src.c_str(), Ren::eShaderType::Frag, &sh_status);
-        assert(sh_status == Ren::eShaderLoadStatus::CreatedFromData);
+        assert(sh_status == Ren::eShaderLoadStatus::Found || sh_status == Ren::eShaderLoadStatus::CreatedFromData);
 
         ret = ctx_.LoadProgram(name, vs_ref, fs_ref, {}, {}, &status);
         assert(status == Ren::eProgLoadStatus::CreatedFromData);

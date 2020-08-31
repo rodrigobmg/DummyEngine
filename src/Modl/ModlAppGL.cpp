@@ -768,7 +768,7 @@ void main(void) {
         )";
 
     Ren::ShaderRef skinning_cs_ref =
-        ctx_.LoadShaderGLSL("__skin_cs", diag_vs, Ren::eShaderType::Comp, &sh_status);
+        ctx_.LoadShaderGLSL("__skin_cs", skinning_cs, Ren::eShaderType::Comp, &sh_status);
     assert(sh_status == Ren::eShaderLoadStatus::CreatedFromData);
 
     skinning_prog_ = ctx_.LoadProgram("__skin", skinning_cs_ref, &status);
