@@ -170,7 +170,7 @@ Gui::Renderer::Renderer(Ren::Context &ctx, const JsObject &config) : ctx_(ctx) {
     index_buf_id_ = (uint32_t)ndx_buf_id;
 
     draw_range_index_ = 0;
-    fill_range_index_ = (draw_range_index_ + (FrameSyncWindow - 1)) % FrameSyncWindow;
+    fill_range_index_ = (draw_range_index_ + 1) % FrameSyncWindow;
 }
 
 Gui::Renderer::~Renderer() {

@@ -16,6 +16,9 @@ const int A_ATTRIB = 4;
 const int A_INDICES = 5;
 const int A_WEIGHTS = 6;
 
+const int A_UVS2 = 4;
+const int A_COLOR = 5;
+
 const int U_MVP_MATR = 0;
 const int U_M_MATR = 1;
 const int U_MODE = 2;
@@ -139,6 +142,59 @@ void ModlApp::DrawMeshColored(Ren::MeshRef &ref) {
 
         glDrawElements(GL_TRIANGLES, s->num_indices, GL_UNSIGNED_INT,
                        (void *)uintptr_t(s->offset));
+        ++s;
+    }
+
+    Ren::CheckError("", &log_);
+}
+
+void ModlApp::DrawMeshColored2(Ren::MeshRef& ref) {
+    using namespace Ren;
+
+    Mesh* m = ref.get();
+    Material* mat = m->group(0).mat.get();
+    ProgramRef p = mat->programs[0];
+
+    p = diag_colored_prog_;
+    glUniform1f(U_MODE, (float)view_mode_);
+
+    CheckInitVAOs();
+
+    glBindVertexArray((GLuint)colored2_vao_);
+
+    glUseProgram(p->prog_id());
+
+    Mat4f world_from_object = Mat4f{ 1.0f };
+
+    world_from_object = Translate(world_from_object, Vec3f{ offset_x_, offset_y_, 0 });
+    world_from_object = Rotate(world_from_object, angle_x_, Vec3f{ 1, 0, 0 });
+    world_from_object = Rotate(world_from_object, angle_y_, Vec3f{ 0, 1, 0 });
+
+    Mat4f view_from_world = cam_.view_matrix(), proj_from_view = cam_.proj_matrix();
+
+    Mat4f view_from_object = view_from_world * world_from_object,
+        proj_from_object = proj_from_view * view_from_object;
+
+    glUniformMatrix4fv(U_MVP_MATR, 1, GL_FALSE, ValuePtr(proj_from_object));
+    glUniformMatrix4fv(U_M_MATR, 1, GL_FALSE, ValuePtr(world_from_object));
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
+    const Ren::TriGroup* s = &m->group(0);
+    while (s->offset != -1) {
+        const Ren::Material* mat = s->mat.get();
+
+        if (view_mode_ == eViewMode::DiagUVs1) {
+            BindTexture(DIFFUSEMAP_SLOT, checker_tex_->tex_id());
+        } else if (view_mode_ == eViewMode::DiagVtxColor) {
+        } else {
+            BindTexture(DIFFUSEMAP_SLOT, mat->textures[0]->tex_id());
+        }
+        BindTexture(NORMALMAP_SLOT, mat->textures[1]->tex_id());
+
+        glDrawElements(GL_TRIANGLES, s->num_indices, GL_UNSIGNED_INT,
+            (void*)uintptr_t(s->offset));
         ++s;
     }
 
@@ -372,89 +428,138 @@ void ModlApp::CheckInitVAOs() {
             auto simple_mesh_vao = (GLuint)simple_vao_;
             glDeleteVertexArrays(1, &simple_mesh_vao);
 
+            auto colored2_mesh_vao = (GLuint)colored2_vao_;
+            glDeleteVertexArrays(1, &colored2_mesh_vao);
+
             auto skinned_mesh_vao = (GLuint)skinned_vao_;
             glDeleteVertexArrays(1, &skinned_mesh_vao);
         }
 
-        GLuint simple_mesh_vao;
+        { // VAO for simple meshes
+            GLuint simple_mesh_vao;
 
-        glGenVertexArrays(1, &simple_mesh_vao);
-        glBindVertexArray(simple_mesh_vao);
+            glGenVertexArrays(1, &simple_mesh_vao);
+            glBindVertexArray(simple_mesh_vao);
 
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gl_indices_buf);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gl_indices_buf);
 
-        const int buf1_stride = 16, buf2_stride = 16;
+            const int buf1_stride = 16, buf2_stride = 16;
 
-        { // Assign attributes from buf1
-            glBindBuffer(GL_ARRAY_BUFFER, gl_vertex_buf1);
+            { // Assign attributes from buf1
+                glBindBuffer(GL_ARRAY_BUFFER, gl_vertex_buf1);
+
+                glEnableVertexAttribArray(A_POS);
+                glVertexAttribPointer(A_POS, 3, GL_FLOAT, GL_FALSE, buf1_stride,
+                                      (void *)0);
+
+                glEnableVertexAttribArray(A_UVS1);
+                glVertexAttribPointer(A_UVS1, 2, GL_HALF_FLOAT, GL_FALSE, buf1_stride,
+                                      (void *)(3 * sizeof(float)));
+            }
+
+            { // Assign attributes from buf2
+                glBindBuffer(GL_ARRAY_BUFFER, gl_vertex_buf2);
+
+                glEnableVertexAttribArray(A_NORMAL);
+                glVertexAttribPointer(A_NORMAL, 4, GL_SHORT, GL_TRUE, buf2_stride,
+                                      (void *)0);
+
+                glEnableVertexAttribArray(A_TANGENT);
+                glVertexAttribPointer(A_TANGENT, 2, GL_SHORT, GL_TRUE, buf2_stride,
+                                      (void *)(4 * sizeof(uint16_t)));
+
+                glEnableVertexAttribArray(A_ATTRIB);
+                glVertexAttribIPointer(A_ATTRIB, 1, GL_UNSIGNED_INT, buf2_stride,
+                                       (void *)(6 * sizeof(uint16_t)));
+            }
+
+            glBindVertexArray(0);
+
+            simple_vao_ = (uint32_t)simple_mesh_vao;
+        }
+
+        { // VAO for 4-colored meshes
+            GLuint colored2_mesh_vao;
+            glGenVertexArrays(1, &colored2_mesh_vao);
+            glBindVertexArray(colored2_mesh_vao);
+
+            glBindBuffer(GL_ARRAY_BUFFER, gl_skin_vertex_buf);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gl_indices_buf);
+
+            const int stride_skin_buf = 48;
 
             glEnableVertexAttribArray(A_POS);
-            glVertexAttribPointer(A_POS, 3, GL_FLOAT, GL_FALSE, buf1_stride, (void *)0);
-
-            glEnableVertexAttribArray(A_UVS1);
-            glVertexAttribPointer(A_UVS1, 2, GL_HALF_FLOAT, GL_FALSE, buf1_stride,
-                                  (void *)(3 * sizeof(float)));
-        }
-
-        { // Assign attributes from buf2
-            glBindBuffer(GL_ARRAY_BUFFER, gl_vertex_buf2);
+            glVertexAttribPointer(A_POS, 3, GL_FLOAT, GL_FALSE, stride_skin_buf,
+                                  (void *)0);
 
             glEnableVertexAttribArray(A_NORMAL);
-            glVertexAttribPointer(A_NORMAL, 4, GL_SHORT, GL_TRUE, buf2_stride, (void *)0);
+            glVertexAttribPointer(A_NORMAL, 4, GL_SHORT, GL_TRUE, stride_skin_buf,
+                                  (void *)(3 * sizeof(float)));
 
             glEnableVertexAttribArray(A_TANGENT);
-            glVertexAttribPointer(A_TANGENT, 2, GL_SHORT, GL_TRUE, buf2_stride,
-                                  (void *)(4 * sizeof(uint16_t)));
+            glVertexAttribPointer(A_TANGENT, 2, GL_SHORT, GL_TRUE, stride_skin_buf,
+                                  (void *)(3 * sizeof(float) + 4 * sizeof(uint16_t)));
 
-            glEnableVertexAttribArray(A_ATTRIB);
-            glVertexAttribIPointer(A_ATTRIB, 1, GL_UNSIGNED_INT, buf2_stride,
-                                   (void *)(6 * sizeof(uint16_t)));
+            glEnableVertexAttribArray(A_UVS1);
+            glVertexAttribPointer(A_UVS1, 2, GL_HALF_FLOAT, GL_FALSE, stride_skin_buf,
+                                  (void *)(3 * sizeof(float) + 6 * sizeof(uint16_t)));
+
+            glEnableVertexAttribArray(A_UVS2);
+            glVertexAttribPointer(A_UVS2, 2, GL_HALF_FLOAT, GL_FALSE, stride_skin_buf,
+                                  (void *)(3 * sizeof(float) + 8 * sizeof(uint16_t)));
+
+            glEnableVertexAttribArray(A_COLOR);
+            glVertexAttribIPointer(A_COLOR, 4, GL_UNSIGNED_INT, stride_skin_buf,
+                                   (void *)(3 * sizeof(float) + 10 * sizeof(uint16_t)));
+
+            glBindVertexArray(0);
+
+            colored2_vao_ = (uint32_t)colored2_mesh_vao;
         }
 
-        glBindVertexArray(0);
+        { // VAO for skinned meshes
+            GLuint skinned_mesh_vao;
+            glGenVertexArrays(1, &skinned_mesh_vao);
+            glBindVertexArray(skinned_mesh_vao);
 
-        simple_vao_ = (uint32_t)simple_mesh_vao;
+            glBindBuffer(GL_ARRAY_BUFFER, gl_skin_vertex_buf);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gl_indices_buf);
 
-        GLuint skinned_mesh_vao;
-        glGenVertexArrays(1, &skinned_mesh_vao);
-        glBindVertexArray(skinned_mesh_vao);
+            const int stride_skin_buf = 48;
+            glEnableVertexAttribArray(A_POS);
+            glVertexAttribPointer(A_POS, 3, GL_FLOAT, GL_FALSE, stride_skin_buf,
+                                  (void *)0);
 
-        glBindBuffer(GL_ARRAY_BUFFER, gl_skin_vertex_buf);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gl_indices_buf);
+            glEnableVertexAttribArray(A_NORMAL);
+            glVertexAttribPointer(A_NORMAL, 4, GL_SHORT, GL_TRUE, stride_skin_buf,
+                                  (void *)(3 * sizeof(float)));
 
-        const int stride_skin_buf = 48;
-        glEnableVertexAttribArray(A_POS);
-        glVertexAttribPointer(A_POS, 3, GL_FLOAT, GL_FALSE, stride_skin_buf, (void *)0);
+            glEnableVertexAttribArray(A_TANGENT);
+            glVertexAttribPointer(A_TANGENT, 2, GL_SHORT, GL_TRUE, stride_skin_buf,
+                                  (void *)(3 * sizeof(float) + 4 * sizeof(int16_t)));
 
-        glEnableVertexAttribArray(A_NORMAL);
-        glVertexAttribPointer(A_NORMAL, 4, GL_SHORT, GL_TRUE, stride_skin_buf,
-                              (void *)(3 * sizeof(float)));
+            glEnableVertexAttribArray(A_UVS1);
+            glVertexAttribPointer(A_UVS1, 2, GL_HALF_FLOAT, GL_FALSE, stride_skin_buf,
+                                  (void *)(3 * sizeof(float) + 6 * sizeof(int16_t)));
 
-        glEnableVertexAttribArray(A_TANGENT);
-        glVertexAttribPointer(A_TANGENT, 2, GL_SHORT, GL_TRUE, stride_skin_buf,
-                              (void *)(3 * sizeof(float) + 4 * sizeof(int16_t)));
+            glEnableVertexAttribArray(A_ATTRIB);
+            glVertexAttribIPointer(A_ATTRIB, 1, GL_UNSIGNED_INT, stride_skin_buf,
+                                   (void *)(6 * sizeof(uint16_t)));
 
-        glEnableVertexAttribArray(A_UVS1);
-        glVertexAttribPointer(A_UVS1, 2, GL_HALF_FLOAT, GL_FALSE, stride_skin_buf,
-                              (void *)(3 * sizeof(float) + 6 * sizeof(int16_t)));
+            glEnableVertexAttribArray(A_INDICES);
+            glVertexAttribPointer(
+                A_INDICES, 4, GL_UNSIGNED_SHORT, GL_FALSE, stride_skin_buf,
+                (void *)(3 * sizeof(float) + 6 * sizeof(int16_t) + 4 * sizeof(uint16_t)));
 
-        glEnableVertexAttribArray(A_ATTRIB);
-        glVertexAttribIPointer(A_ATTRIB, 1, GL_UNSIGNED_INT, buf2_stride,
-                               (void *)(6 * sizeof(uint16_t)));
+            glEnableVertexAttribArray(A_WEIGHTS);
+            glVertexAttribPointer(
+                A_WEIGHTS, 4, GL_UNSIGNED_SHORT, GL_TRUE, stride_skin_buf,
+                (void *)(3 * sizeof(float) + 6 * sizeof(int16_t) + 8 * sizeof(uint16_t)));
 
-        glEnableVertexAttribArray(A_INDICES);
-        glVertexAttribPointer(
-            A_INDICES, 4, GL_UNSIGNED_SHORT, GL_FALSE, stride_skin_buf,
-            (void *)(3 * sizeof(float) + 6 * sizeof(int16_t) + 4 * sizeof(uint16_t)));
+            glBindVertexArray(0);
 
-        glEnableVertexAttribArray(A_WEIGHTS);
-        glVertexAttribPointer(
-            A_WEIGHTS, 4, GL_UNSIGNED_SHORT, GL_TRUE, stride_skin_buf,
-            (void *)(3 * sizeof(float) + 6 * sizeof(int16_t) + 8 * sizeof(uint16_t)));
-
-        glBindVertexArray(0);
-
-        skinned_vao_ = (uint32_t)skinned_mesh_vao;
+            skinned_vao_ = (uint32_t)skinned_mesh_vao;
+        }
 
         last_skin_vertex_buffer_ = (uint32_t)gl_skin_vertex_buf;
         last_delta_buffer_ = (uint32_t)gl_delta_buf;
@@ -516,6 +621,35 @@ void main(void) {
     aVertexTBN_ = mat3(vertex_tangent_ws, cross(vertex_normal_ws, vertex_tangent_ws), vertex_normal_ws);
     aVertexUVs1_ = aVertexUVs1;
     aVertexAttrib_ = unpackUnorm4x8(aVertexColorPacked);
+
+    gl_Position = uMVPMatrix * vec4(aVertexPosition, 1.0);
+}
+)";
+
+    static const char diag_colored2_vs[] =
+        R"(#version 430
+
+layout(location = 0) in vec3 aVertexPosition;
+layout(location = 1) in vec4 aVertexNormal;
+layout(location = 2) in vec2 aVertexTangent;
+layout(location = 3) in vec2 aVertexUVs1;
+layout(location = 4) in vec2 aVertexUVs2;
+layout(location = 5) in uvec4 aVertexColorsPacked;
+
+layout(location = 0) uniform mat4 uMVPMatrix;
+layout(location = 1) uniform mat4 uMMatrix;
+
+out mat3 aVertexTBN_;
+out vec2 aVertexUVs1_;
+out vec4 aVertexAttrib_;
+
+void main(void) {
+    vec3 vertex_normal_ws = normalize((uMMatrix * vec4(aVertexNormal.xyz, 0.0)).xyz);
+    vec3 vertex_tangent_ws = normalize((uMMatrix * vec4(aVertexNormal.w, aVertexTangent, 0.0)).xyz);
+
+    aVertexTBN_ = mat3(vertex_tangent_ws, cross(vertex_normal_ws, vertex_tangent_ws), vertex_normal_ws);
+    aVertexUVs1_ = aVertexUVs1;
+    aVertexAttrib_ = unpackUnorm4x8(aVertexColorsPacked.x);
 
     gl_Position = uMVPMatrix * vec4(aVertexPosition, 1.0);
 }
@@ -623,6 +757,9 @@ void main(void) {
     Ren::ShaderRef diag_colored_vs_ref = ctx_.LoadShaderGLSL(
         "__diag_colored_vs", diag_colored_vs, Ren::eShaderType::Vert, &sh_status);
     assert(sh_status == Ren::eShaderLoadStatus::CreatedFromData);
+    Ren::ShaderRef diag_colored2_vs_ref = ctx_.LoadShaderGLSL(
+        "__diag_colored2_vs", diag_colored2_vs, Ren::eShaderType::Vert, &sh_status);
+    assert(sh_status == Ren::eShaderLoadStatus::CreatedFromData);
     Ren::ShaderRef diag_skinned_vs_ref = ctx_.LoadShaderGLSL(
         "__diag_skinned_vs", diag_skinned_vs, Ren::eShaderType::Vert, &sh_status);
     assert(sh_status == Ren::eShaderLoadStatus::CreatedFromData);
@@ -635,6 +772,9 @@ void main(void) {
     assert(status == Ren::eProgLoadStatus::CreatedFromData);
     diag_colored_prog_ = ctx_.LoadProgram("__diag_colored", diag_colored_vs_ref,
                                           diag_fs_ref, {}, {}, &status);
+    assert(status == Ren::eProgLoadStatus::CreatedFromData);
+    diag_colored2_prog_ = ctx_.LoadProgram("__diag_colored2", diag_colored2_vs_ref,
+                                           diag_fs_ref, {}, {}, &status);
     assert(status == Ren::eProgLoadStatus::CreatedFromData);
     diag_skinned_prog_ = ctx_.LoadProgram("__diag_skinned", diag_skinned_vs_ref,
                                           diag_fs_ref, {}, {}, &status);
@@ -768,7 +908,7 @@ void main(void) {
         )";
 
     Ren::ShaderRef skinning_cs_ref =
-        ctx_.LoadShaderGLSL("__skin_cs", diag_vs, Ren::eShaderType::Comp, &sh_status);
+        ctx_.LoadShaderGLSL("__skin_cs", skinning_cs, Ren::eShaderType::Comp, &sh_status);
     assert(sh_status == Ren::eShaderLoadStatus::CreatedFromData);
 
     skinning_prog_ = ctx_.LoadProgram("__skin", skinning_cs_ref, &status);
@@ -788,6 +928,9 @@ void main(void) {
 void ModlApp::DestroyInternal() {
     auto simple_mesh_vao = (GLuint)simple_vao_;
     glDeleteVertexArrays(1, &simple_mesh_vao);
+
+    auto colored2_mesh_vao = (GLuint)colored2_vao_;
+    glDeleteVertexArrays(1, &colored2_mesh_vao);
 
     auto skinned_mesh_vao = (GLuint)skinned_vao_;
     glDeleteVertexArrays(1, &skinned_mesh_vao);

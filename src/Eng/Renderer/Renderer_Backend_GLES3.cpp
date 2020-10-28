@@ -1798,7 +1798,7 @@ void Renderer::DrawObjectsInternal(const DrawList &list, const FrameBuf *target)
     { // Update buffers
         DebugMarker _("UPDATE BUFFERS");
 
-        // TODO: try to use persistently mapped buffers
+        // TODO: use persistent mapping
 
         cur_buf_chunk_ = (cur_buf_chunk_ + 1) % FrameSyncWindow;
         if (buf_range_fences_[cur_buf_chunk_]) {

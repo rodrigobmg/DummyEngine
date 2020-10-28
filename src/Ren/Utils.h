@@ -42,7 +42,12 @@ void ReorderTriangleIndices(const uint32_t *indices, uint32_t indices_count,
                             uint32_t vtx_count, uint32_t *out_indices);
 
 struct vertex_t {
-    float p[3], n[3], b[3], t[2][2];
+    float p[3];
+    float n[3];
+    float b[3];
+    float t[2][2];
+    uint8_t c[4][4];
+
     int index;
 };
 

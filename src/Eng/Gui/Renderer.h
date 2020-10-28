@@ -86,7 +86,7 @@ class Renderer {
                    const Vec4f &thickness);
 
   private:
-    static const int FrameSyncWindow = 2;
+    static const int FrameSyncWindow = 3;
     static const int MaxClipStackSize = 8;
 
     static_assert(FrameSyncWindow > 1, "!");

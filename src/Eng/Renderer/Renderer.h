@@ -134,7 +134,7 @@ class Renderer {
 
 #if defined(USE_GL_RENDER)
     // Constant that controls buffers orphaning
-    static const int FrameSyncWindow = 2;
+    static const int FrameSyncWindow = 3;
 
     uint32_t temp_tex_ = 0xffffffff;
     Ren::eTexFormat temp_tex_format_ = Ren::eTexFormat::Undefined;

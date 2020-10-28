@@ -61,7 +61,7 @@ class ModlApp {
     LogStdout log_;
 #if defined(USE_GL_RENDER)
     void *gl_ctx_main_ = nullptr;
-    uint32_t simple_vao_ = 0, skinned_vao_ = 0;
+    uint32_t simple_vao_ = 0, colored2_vao_, skinned_vao_ = 0;
     uint32_t last_vertex_buf1_ = 0, last_vertex_buf2_ = 0, last_skin_vertex_buffer_ = 0,
              last_delta_buffer_ = 0, last_index_buffer_ = 0;
     uint32_t uniform_buf_ = 0;
@@ -76,7 +76,8 @@ class ModlApp {
     Ren::Camera cam_;
     Ren::Context ctx_;
 
-    Ren::ProgramRef diag_prog_, diag_colored_prog_, diag_skinned_prog_, skinning_prog_;
+    Ren::ProgramRef diag_prog_, diag_colored_prog_, diag_colored2_prog_,
+        diag_skinned_prog_, skinning_prog_;
     Ren::Texture2DRef checker_tex_;
 
     float angle_x_ = 0.0f, angle_y_ = 0.0f;
@@ -100,6 +101,7 @@ class ModlApp {
     void DestroyInternal();
     void DrawMeshSimple(Ren::MeshRef &ref);
     void DrawMeshColored(Ren::MeshRef &ref);
+    void DrawMeshColored2(Ren::MeshRef &ref);
     void DrawMeshSkeletal(Ren::MeshRef &ref, float dt_s);
 
     void PrintUsage();

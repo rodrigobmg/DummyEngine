@@ -321,6 +321,8 @@ void ModlApp::Frame() {
         DrawMeshSimple(view_mesh_);
     } else if (view_mesh_->type() == Ren::eMeshType::Colored) {
         DrawMeshColored(view_mesh_);
+    } else if (view_mesh_->type() == Ren::eMeshType::Colored2) {
+        DrawMeshColored2(view_mesh_);
     } else if (view_mesh_->type() == Ren::eMeshType::Skeletal) {
         float dt_s = 0.001f * dt_ms;
         DrawMeshSkeletal(view_mesh_, dt_s);
@@ -410,13 +412,14 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
     using namespace std;
     using namespace std::placeholders;
 
-    enum class eModelType {
+    enum class eMeshType {
         M_UNKNOWN,
         M_STATIC,
         M_COLORED,
+        M_COLORED2,
         M_SKEL,
         M_SKEL_COLORED
-    } mesh_type = eModelType::M_UNKNOWN;
+    } mesh_type = eMeshType::M_UNKNOWN;
     struct MeshInfo {
         char name[32];
         float bbox_min[3], bbox_max[3];
@@ -488,13 +491,15 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
         }
 
         if (str == "STATIC_MESH") {
-            mesh_type = eModelType::M_STATIC;
+            mesh_type = eMeshType::M_STATIC;
         } else if (str == "COLORED_MESH") {
-            mesh_type = eModelType::M_COLORED;
+            mesh_type = eMeshType::M_COLORED;
+        } else if (str == "COLORED_MESH2") {
+            mesh_type = eMeshType::M_COLORED2;
         } else if (str == "SKELETAL_MESH") {
-            mesh_type = eModelType::M_SKEL;
+            mesh_type = eMeshType::M_SKEL;
         } else if (str == "SKELETAL_COLORED_MESH") {
-            mesh_type = eModelType::M_SKEL_COLORED;
+            mesh_type = eMeshType::M_SKEL_COLORED;
         } else {
             cerr << "Unknown mesh type" << endl;
             return eCompileResult::RES_PARSE_ERROR;
@@ -527,10 +532,11 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
         for (int i = 0; i < num_vertices; i++) {
             getline(in_file, str);
             const int toks_count = Tokenize(str, " ", toks);
-            if ((mesh_type == eModelType::M_STATIC && toks_count != 10) ||
-                (mesh_type == eModelType::M_COLORED && toks_count != 12) ||
-                (mesh_type == eModelType::M_SKEL && toks_count < 10) ||
-                (mesh_type == eModelType::M_SKEL_COLORED && toks_count < 12)) {
+            if ((mesh_type == eMeshType::M_STATIC && toks_count != 10) ||
+                (mesh_type == eMeshType::M_COLORED && toks_count != 12) ||
+                (mesh_type == eMeshType::M_COLORED2 && toks_count != 26) ||
+                (mesh_type == eMeshType::M_SKEL && toks_count < 10) ||
+                (mesh_type == eMeshType::M_SKEL_COLORED && toks_count < 12)) {
                 cerr << "Wrong number of tokens!" << endl;
                 return eCompileResult::RES_PARSE_ERROR;
             }
@@ -553,22 +559,43 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
                 uvs.push_back(stof(toks[j]));
             }
 
-            if (mesh_type == eModelType::M_STATIC || mesh_type == eModelType::M_SKEL) {
+            if (mesh_type == eMeshType::M_STATIC || mesh_type == eMeshType::M_SKEL) {
                 // parse additional uvs
                 for (int j : {8, 9}) {
                     uvs2.push_back(stof(toks[j]));
                 }
-            } else if (mesh_type == eModelType::M_COLORED ||
-                       mesh_type == eModelType::M_SKEL_COLORED) {
+            } else if (mesh_type == eMeshType::M_COLORED ||
+                       mesh_type == eMeshType::M_SKEL_COLORED) {
                 // parse vertex color
                 for (int j : {8, 9, 10, 11}) {
                     vtx_colors.push_back((uint8_t)(stof(toks[j]) * 255.0f));
                 }
+            } else if (mesh_type == eMeshType::M_COLORED2) {
+                // parse additional uvs
+                for (int j : {8, 9}) {
+                    uvs2.push_back(stof(toks[j]));
+                }
+                // parse color0
+                for (int j : {10, 11, 12, 13}) {
+                    vtx_colors.push_back((uint8_t)(stof(toks[j]) * 255.0f));
+                }
+                // parse color1
+                for (int j : {14, 15, 16, 17}) {
+                    vtx_colors.push_back((uint8_t)(stof(toks[j]) * 255.0f));
+                }
+                // parse color2
+                for (int j : {18, 19, 20, 21}) {
+                    vtx_colors.push_back((uint8_t)(stof(toks[j]) * 255.0f));
+                }
+                // parse color3
+                for (int j : {22, 23, 24, 25}) {
+                    vtx_colors.push_back((uint8_t)(stof(toks[j]) * 255.0f));
+                }
             }
 
-            if (mesh_type == eModelType::M_SKEL ||
-                mesh_type == eModelType::M_SKEL_COLORED) {
-                const int tok_off = (mesh_type == eModelType::M_SKEL_COLORED) ? 12 : 10;
+            if (mesh_type == eMeshType::M_SKEL ||
+                mesh_type == eMeshType::M_SKEL_COLORED) {
+                const int tok_off = (mesh_type == eMeshType::M_SKEL_COLORED) ? 12 : 10;
 
                 // parse joint indices and weights (limited to four bones)
                 int bones_count = (toks_count - tok_off) / 2;
@@ -649,8 +676,8 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
 
     std::cout << "Done" << std::endl;
 
-    if (mesh_type == eModelType::M_SKEL ||
-        mesh_type == eModelType::M_SKEL_COLORED) { // parse skeletal information
+    if (mesh_type == eMeshType::M_SKEL ||
+        mesh_type == eMeshType::M_SKEL_COLORED) { // parse skeletal information
         string str;
         while (getline(in_file, str)) {
             if (str.find("skeleton") != string::npos) {
@@ -700,7 +727,7 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
     std::cout << "Reading shape keys... ";
     std::cout.flush();
 
-    /*if (mesh_type == eModelType::M_SKEL)*/ { // parse shape keys
+    /*if (mesh_type == eMeshType::M_SKEL)*/ { // parse shape keys
         string str;
         while (getline(in_file, str)) {
             if (str.find("ShapeKey") != string::npos) {
@@ -755,11 +782,15 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
             memcpy(&vertices[i].n[0], &normals[i * 3ull], sizeof(float) * 3);
             memset(&vertices[i].b[0], 0, sizeof(float) * 3);
             memcpy(&vertices[i].t[0][0], &uvs[i * 2ull], sizeof(float) * 2);
-            if (mesh_type == eModelType::M_STATIC || mesh_type == eModelType::M_SKEL) {
+            if (mesh_type == eMeshType::M_STATIC || mesh_type == eMeshType::M_SKEL) {
                 memcpy(&vertices[i].t[1][0], &uvs2[i * 2ull], sizeof(float) * 2);
-            } else if (mesh_type == eModelType::M_COLORED ||
-                       mesh_type == eModelType::M_SKEL_COLORED) {
-                memcpy(&vertices[i].t[1][0], &vtx_colors[i * 4ull], sizeof(uint8_t) * 4);
+            } else if (mesh_type == eMeshType::M_COLORED ||
+                       mesh_type == eMeshType::M_SKEL_COLORED) {
+                memcpy(&vertices[i].c[0][0], &vtx_colors[i * 4ull], sizeof(uint8_t) * 4);
+            } else if (mesh_type == eMeshType::M_COLORED2) {
+                memcpy(&vertices[i].t[1][0], &uvs2[i * 2ull], sizeof(float) * 2);
+                memcpy(&vertices[i].c[0][0], &vtx_colors[i * 16ull],
+                       sizeof(uint8_t) * 16);
             }
             vertices[i].index = i;
         }
@@ -782,19 +813,29 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
             uvs.push_back(vertices[i].t[0][0]);
             uvs.push_back(vertices[i].t[0][1]);
 
-            if (mesh_type == eModelType::M_COLORED ||
-                mesh_type == eModelType::M_SKEL_COLORED) {
-                const size_t colors_start = vtx_colors.size();
-                vtx_colors.resize(vtx_colors.size() + 4);
-                memcpy(&vtx_colors[colors_start], &vertices[i].t[1][0],
-                       sizeof(uint8_t) * 4);
+            if (mesh_type == eMeshType::M_COLORED ||
+                mesh_type == eMeshType::M_SKEL_COLORED) {
+                vtx_colors.push_back(vertices[i].c[0][0]);
+                vtx_colors.push_back(vertices[i].c[0][1]);
+                vtx_colors.push_back(vertices[i].c[0][2]);
+                vtx_colors.push_back(vertices[i].c[0][3]);
+            } else if (mesh_type == eMeshType::M_COLORED2) {
+                uvs2.push_back(vertices[i].t[1][0]);
+                uvs2.push_back(vertices[i].t[1][1]);
+
+                for (int j = 0; j < 4; j++) {
+                    vtx_colors.push_back(vertices[i].c[j][0]);
+                    vtx_colors.push_back(vertices[i].c[j][1]);
+                    vtx_colors.push_back(vertices[i].c[j][2]);
+                    vtx_colors.push_back(vertices[i].c[j][3]);
+                }
             } else {
                 uvs2.push_back(vertices[i].t[1][0]);
                 uvs2.push_back(vertices[i].t[1][1]);
             }
 
-            if (mesh_type == eModelType::M_SKEL ||
-                mesh_type == eModelType::M_SKEL_COLORED) {
+            if (mesh_type == eMeshType::M_SKEL ||
+                mesh_type == eMeshType::M_SKEL_COLORED) {
                 for (int j = 0; j < 8; j++) {
                     weights.push_back(weights[(size_t)vertices[i].index * 8 + j]);
                 }
@@ -878,17 +919,23 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
                                 tangents.begin() + i * 3ull + 3);
                 uvs.insert(uvs.end(), uvs.begin() + i * 2ull, uvs.begin() + i * 2ull + 2);
 
-                if (mesh_type == eModelType::M_COLORED ||
-                    mesh_type == eModelType::M_SKEL_COLORED) {
+                if (mesh_type == eMeshType::M_COLORED ||
+                    mesh_type == eMeshType::M_SKEL_COLORED) {
                     vtx_colors.insert(vtx_colors.end(), vtx_colors.begin() + i * 4ull,
                                       vtx_colors.begin() + i * 4ull + 4);
                 } else {
                     uvs2.insert(uvs2.end(), uvs2.begin() + i * 2ull,
                                 uvs2.begin() + i * 2ull + 2);
+
+                    if (mesh_type == eMeshType::M_COLORED2) {
+                        vtx_colors.insert(vtx_colors.end(),
+                                          vtx_colors.begin() + i * 16ull,
+                                          vtx_colors.begin() + i * 16ull + 16);
+                    }
                 }
 
-                if (mesh_type == eModelType::M_SKEL ||
-                    mesh_type == eModelType::M_SKEL_COLORED) {
+                if (mesh_type == eMeshType::M_SKEL ||
+                    mesh_type == eMeshType::M_SKEL_COLORED) {
                     weights.insert(weights.end(), weights.begin() + i * 8ull,
                                    weights.begin() + i * 8ull + 8);
                 }
@@ -917,16 +964,21 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
                                tangents.begin() + i * 3ull + 3);
                 uvs.erase(uvs.begin() + i * 2ull, uvs.begin() + i * 2ull + 2);
 
-                if (mesh_type == eModelType::M_COLORED ||
-                    mesh_type == eModelType::M_SKEL_COLORED) {
+                if (mesh_type == eMeshType::M_COLORED ||
+                    mesh_type == eMeshType::M_SKEL_COLORED) {
                     vtx_colors.erase(vtx_colors.begin() + i * 4ull,
                                      vtx_colors.begin() + i * 4ull + 4);
                 } else {
                     uvs2.erase(uvs2.begin() + i * 2ull, uvs2.begin() + i * 2ull + 2);
+
+                    if (mesh_type == eMeshType::M_COLORED2) {
+                        vtx_colors.erase(vtx_colors.begin() + i * 16ull,
+                                         vtx_colors.begin() + i * 16ull + 16);
+                    }
                 }
 
-                if (mesh_type == eModelType::M_SKEL ||
-                    mesh_type == eModelType::M_SKEL_COLORED) {
+                if (mesh_type == eMeshType::M_SKEL ||
+                    mesh_type == eMeshType::M_SKEL_COLORED) {
                     weights.erase(weights.begin() + i * 8ull,
                                   weights.begin() + i * 8ull + 8);
                 }
@@ -979,7 +1031,7 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
             vtx_colors[i * 4 + 3] = uint8_t(occlusion[i][3] * 255.0f);
         }
 
-        mesh_type = eModelType::M_COLORED;
+        mesh_type = eMeshType::M_COLORED;
 
         std::cout << "Done" << std::endl;
     }
@@ -1047,13 +1099,15 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
     // Write output file
     ofstream out_file(out_file_name, ios::binary);
 
-    if (mesh_type == eModelType::M_STATIC) {
+    if (mesh_type == eMeshType::M_STATIC) {
         out_file.write("STATIC_MESH\0", 12);
-    } else if (mesh_type == eModelType::M_COLORED) {
+    } else if (mesh_type == eMeshType::M_COLORED) {
         out_file.write("COLORE_MESH\0", 12);
-    } else if (mesh_type == eModelType::M_SKEL) {
+    } else if (mesh_type == eMeshType::M_COLORED2) {
+        out_file.write("COLOR2_MESH\0", 12);
+    } else if (mesh_type == eMeshType::M_SKEL) {
         out_file.write("SKELET_MESH\0", 12);
-    } else if (mesh_type == eModelType::M_SKEL_COLORED) {
+    } else if (mesh_type == eMeshType::M_SKEL_COLORED) {
         out_file.write("SKECOL_MESH\0", 12);
     }
 
@@ -1076,7 +1130,8 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
         ChunkPos p[7];
     } file_header;
 
-    if (mesh_type == eModelType::M_STATIC || mesh_type == eModelType::M_COLORED) {
+    if (mesh_type == eMeshType::M_STATIC || mesh_type == eMeshType::M_COLORED ||
+        mesh_type == eMeshType::M_COLORED2) {
         file_header.num_chunks = 5;
     } else {
         file_header.num_chunks = 6;
@@ -1092,9 +1147,13 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
     file_offset += file_header.p[CH_MESH_INFO].length;
 
     file_header.p[CH_VTX_ATTR].offset = (int32_t)file_offset;
-    if (mesh_type == eModelType::M_COLORED || mesh_type == eModelType::M_SKEL_COLORED) {
+    if (mesh_type == eMeshType::M_COLORED || mesh_type == eMeshType::M_SKEL_COLORED) {
         file_header.p[CH_VTX_ATTR].length = (int32_t)(
             sizeof(float) * (positions.size() / 3) * 11 +
+            sizeof(uint8_t) * vtx_colors.size() + sizeof(float) * weights.size());
+    } else if (mesh_type == eMeshType::M_COLORED2) {
+        file_header.p[CH_VTX_ATTR].length = (int32_t)(
+            sizeof(float) * (positions.size() / 3) * 13 +
             sizeof(uint8_t) * vtx_colors.size() + sizeof(float) * weights.size());
     } else {
         file_header.p[CH_VTX_ATTR].length = (int32_t)(
@@ -1114,7 +1173,7 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
     file_header.p[CH_STRIPS].length = (int32_t)(sizeof(MeshChunk) * total_chunks.size());
     file_offset += file_header.p[CH_STRIPS].length;
 
-    if (mesh_type == eModelType::M_SKEL || mesh_type == eModelType::M_SKEL_COLORED) {
+    if (mesh_type == eMeshType::M_SKEL || mesh_type == eMeshType::M_SKEL_COLORED) {
         file_header.p[CH_BONES].offset = (int32_t)file_offset;
         file_header.p[CH_BONES].length = (int32_t)(100 * out_bones.size());
         file_offset += file_header.p[CH_BONES].length;
@@ -1138,13 +1197,16 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
         out_file.write((char *)&normals[i * 3ull], sizeof(float) * 3);
         out_file.write((char *)&tangents[i * 3ull], sizeof(float) * 3);
         out_file.write((char *)&uvs[i * 2ull], sizeof(float) * 2);
-        if (mesh_type == eModelType::M_STATIC || mesh_type == eModelType::M_SKEL) {
+        if (mesh_type == eMeshType::M_STATIC || mesh_type == eMeshType::M_SKEL) {
             out_file.write((char *)&uvs2[i * 2ull], sizeof(float) * 2);
-        } else if (mesh_type == eModelType::M_COLORED ||
-                   mesh_type == eModelType::M_SKEL_COLORED) {
+        } else if (mesh_type == eMeshType::M_COLORED ||
+                   mesh_type == eMeshType::M_SKEL_COLORED) {
             out_file.write((char *)&vtx_colors[i * 4ull], sizeof(uint8_t) * 4);
+        } else if (mesh_type == eMeshType::M_COLORED2) {
+            out_file.write((char *)&uvs2[i * 2ull], sizeof(float) * 2);
+            out_file.write((char *)&vtx_colors[i * 16ull], sizeof(uint8_t) * 16);
         }
-        if (mesh_type == eModelType::M_SKEL || mesh_type == eModelType::M_SKEL_COLORED) {
+        if (mesh_type == eMeshType::M_SKEL || mesh_type == eMeshType::M_SKEL_COLORED) {
             out_file.write((char *)&weights[i * 8ull], sizeof(float) * 8);
         }
     }
@@ -1160,7 +1222,7 @@ ModlApp::eCompileResult ModlApp::CompileModel(const std::string &in_file_name,
 
     out_file.write((char *)&total_chunks[0], sizeof(MeshChunk) * total_chunks.size());
 
-    if (mesh_type == eModelType::M_SKEL || mesh_type == eModelType::M_SKEL_COLORED) {
+    if (mesh_type == eMeshType::M_SKEL || mesh_type == eMeshType::M_SKEL_COLORED) {
         for (const OutBone &bone : out_bones) {
             out_file.write((char *)&bone.name, 64);
             out_file.write((char *)&bone.id, sizeof(int32_t));
@@ -1759,9 +1821,11 @@ Ren::ProgramRef ModlApp::OnProgramNeeded(const char *name, const char *vs_shader
         fs_file.Read((char *)fs_src.data(), fs_size);
 
         Ren::eShaderLoadStatus sh_status;
-        Ren::ShaderRef vs_ref = ctx_.LoadShaderGLSL(vs_shader, vs_src.c_str(), Ren::eShaderType::Vert, &sh_status);
+        Ren::ShaderRef vs_ref = ctx_.LoadShaderGLSL(vs_shader, vs_src.c_str(),
+                                                    Ren::eShaderType::Vert, &sh_status);
         assert(sh_status == Ren::eShaderLoadStatus::CreatedFromData);
-        Ren::ShaderRef fs_ref = ctx_.LoadShaderGLSL(fs_shader, fs_src.c_str(), Ren::eShaderType::Frag, &sh_status);
+        Ren::ShaderRef fs_ref = ctx_.LoadShaderGLSL(fs_shader, fs_src.c_str(),
+                                                    Ren::eShaderType::Frag, &sh_status);
         assert(sh_status == Ren::eShaderLoadStatus::CreatedFromData);
 
         ret = ctx_.LoadProgram(name, vs_ref, fs_ref, {}, {}, &status);
