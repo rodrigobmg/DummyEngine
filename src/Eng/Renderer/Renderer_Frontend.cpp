@@ -417,6 +417,8 @@ void Renderer::GatherDrawables(const SceneData &scene, const Ren::Camera &cam,
                             const AnimState &as = anims[obj.components[CompAnimState]];
                             base_vertex = __push_skeletal_mesh(skinned_buf_vtx_offset, as,
                                                                mesh, list);
+                        } else if (obj.comp_mask & CompVegStateBit) {
+                            base_vertex = mesh->sk_attribs_buf().offset / 48;
                         }
                         proc_objects_.data[n->prim_index].base_vertex = base_vertex;
 
@@ -455,6 +457,10 @@ void Renderer::GatherDrawables(const SceneData &scene, const Ren::Camera &cam,
                             main_batch.instance_indices[0] =
                                 (uint32_t)(list.instances.count - 1);
                             main_batch.instance_count = 1;
+
+                            if (obj.comp_mask & CompVegStateBit) {
+                                main_batch.vege_flag = 1;
+                            }
 
                             if (zfill_enabled &&
                                 (!(mat->flags() & uint32_t(eMaterialFlags::AlphaBlend)) ||

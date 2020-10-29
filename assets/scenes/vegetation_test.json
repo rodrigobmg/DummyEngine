@@ -31,7 +31,7 @@
 				]
 			}, 
 			"drawable" : {
-				"mesh_file" : "vegetation/leaf_tree.mesh", 
+				"mesh_file" : "vegetation/leaf_tree2.mesh", 
 				"visible_to_probes" : false
 			},
 			"veg_state" : {
@@ -123,10 +123,10 @@
 	], 
 	"camera" : {
 		"view_origin" : [
-			2.294942, 7.756365, 13.617617
+			0.937826, 8.731262, 2.255710
 		], 
 		"view_dir" : [
-			0.012581, -0.138751, -0.977384
+			-0.551536, -0.751504, -0.325165
 		], 
 		"fwd_speed" : 0.75, 
 		"fov" : 45, 

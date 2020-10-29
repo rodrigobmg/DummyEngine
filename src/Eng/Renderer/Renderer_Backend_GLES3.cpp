@@ -174,7 +174,9 @@ uint32_t __draw_list_range_full(Ren::Context &ctx, const DrawList &list, uint32_
         const MainDrawBatch &batch =
             list.main_batches.data[list.main_batch_indices.data[i]];
         if ((batch.sort_key & MainDrawBatch::FlagBits) != mask) {
-            break;
+            //break;
+            // TODO: revert this!
+            continue;
         }
 
         if (!batch.instance_count) {
@@ -237,8 +239,8 @@ uint32_t __draw_list_range_full(Ren::Context &ctx, const DrawList &list, uint32_
 }
 
 uint32_t _draw_list_range_full_rev(Ren::Context &ctx, const DrawList &list, uint32_t ndx,
-                                    uint64_t mask, uint64_t &cur_mat_id,
-                                    uint64_t &cur_prog_id, BackendInfo &backend_info) {
+                                   uint64_t mask, uint64_t &cur_mat_id,
+                                   uint64_t &cur_prog_id, BackendInfo &backend_info) {
 
     int i = (int)ndx;
     for (; i >= 0; i--) {
@@ -1262,10 +1264,12 @@ void Renderer::CheckInitVAOs() {
 
     Ren::BufferRef vtx_buf1 = ctx_.default_vertex_buf1(),
                    vtx_buf2 = ctx_.default_vertex_buf2(),
+                   skin_buf = ctx_.default_skin_vertex_buf(),
                    ndx_buf = ctx_.default_indices_buf();
 
     auto gl_vertex_buf1 = (GLuint)vtx_buf1->buf_id(),
          gl_vertex_buf2 = (GLuint)vtx_buf2->buf_id(),
+         gl_skin_buf = (GLuint)skin_buf->buf_id(),
          gl_indices_buf = (GLuint)ndx_buf->buf_id();
 
     if (gl_vertex_buf1 != last_vertex_buf1_ || gl_vertex_buf2 != last_vertex_buf2_ ||
@@ -1301,7 +1305,7 @@ void Renderer::CheckInitVAOs() {
             glDeleteVertexArrays(1, &depth_pass_skin_transp_vao);
         }
 
-        const int buf1_stride = 16, buf2_stride = 16;
+        const int buf1_stride = 16, buf2_stride = 16, skin_buf_stride = 48;
 
         { // VAO for shadow and depth-fill passes (solid, uses position attribute only)
             GLuint depth_pass_solid_vao;
@@ -1325,23 +1329,16 @@ void Renderer::CheckInitVAOs() {
             glGenVertexArrays(1, &depth_pass_vege_solid_vao);
             glBindVertexArray(depth_pass_vege_solid_vao);
 
+            glBindBuffer(GL_ARRAY_BUFFER, gl_skin_buf);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gl_indices_buf);
 
-            { // Setup attributes from buffer 1
-                glBindBuffer(GL_ARRAY_BUFFER, gl_vertex_buf1);
+            glEnableVertexAttribArray(REN_VTX_POS_LOC);
+            glVertexAttribPointer(REN_VTX_POS_LOC, 3, GL_FLOAT, GL_FALSE, skin_buf_stride,
+                                  (void *)0); // NOLINT
 
-                glEnableVertexAttribArray(REN_VTX_POS_LOC);
-                glVertexAttribPointer(REN_VTX_POS_LOC, 3, GL_FLOAT, GL_FALSE, buf1_stride,
-                                      (void *)0); // NOLINT
-            }
-
-            { // Setup attributes from buffer 2
-                glBindBuffer(GL_ARRAY_BUFFER, gl_vertex_buf2);
-
-                glEnableVertexAttribArray(REN_VTX_AUX_LOC);
-                glVertexAttribIPointer(REN_VTX_AUX_LOC, 1, GL_UNSIGNED_INT, buf2_stride,
-                                       (void *)(6 * sizeof(uint16_t)));
-            }
+            glEnableVertexAttribArray(REN_VTX_AUX_LOC);
+            glVertexAttribIPointer(REN_VTX_AUX_LOC, 4, GL_UNSIGNED_INT, skin_buf_stride,
+                                   (void *)(3 * sizeof(float) + 10 * sizeof(uint16_t)));
 
             glBindVertexArray(0);
             depth_pass_vege_solid_vao_ = (uint32_t)depth_pass_vege_solid_vao;
@@ -1489,6 +1486,39 @@ void Renderer::CheckInitVAOs() {
 
             glBindVertexArray(0);
             draw_pass_vao_ = (uint32_t)draw_pass_vao;
+        }
+
+        { // VAO for vege2 drawing
+            GLuint draw_pass_vege_vao;
+            glGenVertexArrays(1, &draw_pass_vege_vao);
+            glBindVertexArray(draw_pass_vege_vao);
+
+            glBindBuffer(GL_ARRAY_BUFFER, gl_skin_buf);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, gl_indices_buf);
+
+            glEnableVertexAttribArray(REN_VTX_POS_LOC);
+            glVertexAttribPointer(REN_VTX_POS_LOC, 3, GL_FLOAT, GL_FALSE, skin_buf_stride,
+                                  (void *)0); // NOLINT
+
+            glEnableVertexAttribArray(REN_VTX_NOR_LOC);
+            glVertexAttribPointer(REN_VTX_NOR_LOC, 4, GL_SHORT, GL_TRUE, skin_buf_stride,
+                                  (void *)(3 * sizeof(float)));
+
+            glEnableVertexAttribArray(REN_VTX_TAN_LOC);
+            glVertexAttribPointer(REN_VTX_TAN_LOC, 2, GL_SHORT, GL_TRUE, skin_buf_stride,
+                                  (void *)(3 * sizeof(float) + 4 * sizeof(uint16_t)));
+
+            glEnableVertexAttribArray(REN_VTX_UV1_LOC);
+            glVertexAttribPointer(REN_VTX_UV1_LOC, 2, GL_HALF_FLOAT, GL_FALSE,
+                                  skin_buf_stride,
+                                  (void *)(3 * sizeof(float) + 6 * sizeof(uint16_t)));
+
+            glEnableVertexAttribArray(REN_VTX_AUX_LOC);
+            glVertexAttribIPointer(REN_VTX_AUX_LOC, 4, GL_UNSIGNED_INT, skin_buf_stride,
+                                   (void *)(3 * sizeof(float) + 10 * sizeof(uint16_t)));
+
+            glBindVertexArray(0);
+            draw_pass_vege_vao_ = (uint32_t)draw_pass_vege_vao;
         }
 
         { // Create vao for temporary buffer
@@ -2205,6 +2235,7 @@ void Renderer::DrawObjectsInternal(const DrawList &list, const FrameBuf *target)
         }
 
         // draw opaque vegetation
+#if 0
         glBindVertexArray(depth_pass_vege_solid_vao_);
         glUseProgram(shadow_vege_solid_prog_->prog_id());
 
@@ -2247,6 +2278,7 @@ void Renderer::DrawObjectsInternal(const DrawList &list, const FrameBuf *target)
                 backend_info_.shadow_draw_calls_count++;
             }
         }
+#endif
 
         // draw transparent (alpha-tested) objects
         glBindVertexArray(depth_pass_transp_vao_);
@@ -3064,6 +3096,17 @@ void Renderer::DrawObjectsInternal(const DrawList &list, const FrameBuf *target)
 
         uint32_t i = 0;
 
+        { // vege2
+            DebugMarker _m("VEGE2");
+
+            glBindVertexArray((GLuint)draw_pass_vege_vao_);
+
+            __draw_list_range_full(ctx_, list, i, MainDrawBatch::BitVege, cur_mat_id, cur_prog_id,
+                backend_info_);
+
+            glBindVertexArray((GLuint)draw_pass_vao_);
+        }
+
         { // one-sided1
             DebugMarker _m("ONE-SIDED-1");
             i = __draw_list_range_full(ctx_, list, i, 0ull, cur_mat_id, cur_prog_id,
@@ -3101,10 +3144,10 @@ void Renderer::DrawObjectsInternal(const DrawList &list, const FrameBuf *target)
         { // two-sided-tested-blended
             DebugMarker _m("TWO-SIDED-TESTED-BLENDED");
             i = _draw_list_range_full_rev(ctx_, list, list.main_batch_indices.count - 1,
-                                           MainDrawBatch::BitAlphaBlend |
-                                               MainDrawBatch::BitAlphaTest |
-                                               MainDrawBatch::BitTwoSided,
-                                           cur_mat_id, cur_prog_id, backend_info_);
+                                          MainDrawBatch::BitAlphaBlend |
+                                              MainDrawBatch::BitAlphaTest |
+                                              MainDrawBatch::BitTwoSided,
+                                          cur_mat_id, cur_prog_id, backend_info_);
         }
 
         glEnable(GL_CULL_FACE);

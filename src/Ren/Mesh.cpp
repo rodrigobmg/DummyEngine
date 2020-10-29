@@ -37,11 +37,7 @@ struct vertex_colored_t {
 static_assert(sizeof(vertex_colored_t) == 48, "!");
 
 struct vertex_colored2_t {
-    float p[3];
-    float n[3];
-    float b[3];
-    float t0[2];
-    float t1[2];
+    vertex_simple_t v;
     uint8_t c0[4];
     uint8_t c1[4];
     uint8_t c2[4];
@@ -168,15 +164,8 @@ void pack_vertex(const vertex_colored_t &in_v, packed_vertex_t &out_v) {
 }
 
 void pack_vertex(const vertex_colored2_t &in_v, packed_vertex_colored2_t &out_v) {
-    out_v.v.p[0] = in_v.p[0];
-    out_v.v.p[1] = in_v.p[1];
-    out_v.v.p[2] = in_v.p[2];
-    out_v.v.n_and_bx[0] = f32_to_s16(in_v.n[0]);
-    out_v.v.n_and_bx[1] = f32_to_s16(in_v.n[1]);
-    out_v.v.n_and_bx[2] = f32_to_s16(in_v.n[2]);
-    out_v.v.n_and_bx[3] = f32_to_s16(in_v.b[0]);
-    out_v.v.byz[0] = f32_to_s16(in_v.b[1]);
-    out_v.v.byz[1] = f32_to_s16(in_v.b[2]);
+    pack_vertex(in_v.v, out_v.v);
+
     memcpy(out_v.colors[0], in_v.c0, sizeof(uint8_t) * 4);
     memcpy(out_v.colors[1], in_v.c1, sizeof(uint8_t) * 4);
     memcpy(out_v.colors[2], in_v.c2, sizeof(uint8_t) * 4);

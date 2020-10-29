@@ -94,7 +94,7 @@ class Renderer {
 #if !defined(__ANDROID__)
         (EnableZFill | EnableCulling | EnableSSR | EnableSSAO | EnableLightmap |
          EnableLights | EnableDecals | EnableShadows /*| EnableOIT*/ | EnableTonemap |
-         EnableBloom | EnableTaa /*EnableMsaa | EnableFxaa*/ | EnableTimers |
+         EnableBloom /*| EnableTaa*/ | EnableMsaa /*| EnableFxaa*/ | EnableTimers |
          EnableDOF /*| DebugEllipsoids*/);
 #else
         (EnableZFill | EnableCulling | EnableSSR | EnableLightmap | EnableLights |
@@ -149,7 +149,7 @@ class Renderer {
     uint32_t unif_shared_data_block_[FrameSyncWindow];
     uint32_t temp_vao_, fs_quad_vao_, depth_pass_solid_vao_, depth_pass_vege_solid_vao_,
         depth_pass_transp_vao_, depth_pass_vege_transp_vao_, depth_pass_skin_solid_vao_,
-        depth_pass_skin_transp_vao_, draw_pass_vao_, skydome_vao_, sphere_vao_;
+        depth_pass_skin_transp_vao_, draw_pass_vao_, draw_pass_vege_vao_, skydome_vao_, sphere_vao_;
     uint32_t temp_buf1_vtx_offset_, temp_buf2_vtx_offset_, temp_buf_ndx_offset_,
         skydome_vtx1_offset_, skydome_vtx2_offset_, skydome_ndx_offset_,
         sphere_vtx1_offset_, sphere_vtx2_offset_, sphere_ndx_offset_, quad_vtx1_offset_,

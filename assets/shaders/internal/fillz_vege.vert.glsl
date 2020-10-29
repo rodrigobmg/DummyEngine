@@ -18,7 +18,7 @@ layout(location = REN_VTX_POS_LOC) in vec3 aVertexPosition;
 #ifdef TRANSPARENT_PERM
 layout(location = REN_VTX_UV1_LOC) in vec2 aVertexUVs1;
 #endif
-layout(location = REN_VTX_AUX_LOC) in uint aVertexColorPacked;
+layout(location = REN_VTX_AUX_LOC) in uvec4 aVertexColorsPacked;
 
 #if defined(VULKAN) || defined(GL_SPIRV)
 layout (binding = REN_UB_SHARED_DATA_LOC, std140)
@@ -65,14 +65,14 @@ void main() {
     // load vegetation properties
     vec4 veg_params = texelFetch(instances_buffer, instance_curr * 4 + 3);
 
-    vec4 vtx_color = unpackUnorm4x8(aVertexColorPacked);
+    vec4 vtx_color = unpackUnorm4x8(aVertexColorsPacked.x);
 
     vec3 obj_pos_ws = model_matrix_curr[3].xyz;
     vec4 wind_scroll = shrd_data.uWindScroll + vec4(VEGE_NOISE_SCALE_LF * obj_pos_ws.xz, VEGE_NOISE_SCALE_HF * obj_pos_ws.xz);
     vec4 wind_params = unpackUnorm4x8(floatBitsToUint(veg_params.x));
     vec4 wind_vec_ls = vec4(unpackHalf2x16(floatBitsToUint(veg_params.y)), unpackHalf2x16(floatBitsToUint(veg_params.z)));
 
-    vec3 vtx_pos_ls = TransformVegetation(aVertexPosition, vtx_color, wind_scroll, wind_params, wind_vec_ls, noise_texture);
+    vec3 vtx_pos_ls = TransformVegetation2(aVertexPosition, aVertexColorsPacked, wind_scroll, wind_params, wind_vec_ls, noise_texture);
     vec3 vtx_pos_ws = (model_matrix_curr * vec4(vtx_pos_ls, 1.0)).xyz;
 
 #ifdef TRANSPARENT_PERM

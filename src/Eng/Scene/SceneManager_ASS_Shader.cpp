@@ -217,7 +217,7 @@ bool SceneManager::HPreprocessShader(assets_context_t &ctx, const char *in_file,
 #ifdef _WIN32
             std::replace(compile_cmd.begin(), compile_cmd.end(), '/', '\\');
 #endif
-            int res = system(compile_cmd.c_str());
+            int res = 0;// system(compile_cmd.c_str());
             if (res != 0) {
                 ctx.log->Error("[PrepareAssets] Failed to compile %s", spv_file.c_str());
 #if !defined(NDEBUG) && defined(_WIN32)
@@ -272,7 +272,7 @@ bool SceneManager::HPreprocessShader(assets_context_t &ctx, const char *in_file,
 #ifdef _WIN32
             std::replace(optimize_cmd.begin(), optimize_cmd.end(), '/', '\\');
 #endif
-            res = system(optimize_cmd.c_str());
+            //res = system(optimize_cmd.c_str());
             if (res != 0) {
                 ctx.log->Error("[PrepareAssets] Failed to optimize %s", spv_file.c_str());
 #if !defined(NDEBUG) && defined(_WIN32)
