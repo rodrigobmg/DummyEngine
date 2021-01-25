@@ -199,7 +199,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 
 int DummyApp::Init(int w, int h) {
-    BOOL dpi_result = SetProcessDPIAware();
+    const BOOL dpi_result = SetProcessDPIAware();
     (void)dpi_result;
 
     WNDCLASSEX window_class = {};
@@ -304,7 +304,7 @@ int DummyApp::Init(int w, int h) {
                                         0};
 
     UINT format_count;
-    const BOOL status = wglChoosePixelFormatARB(device_context_, pixel_attribs, nullptr,
+    BOOL status = wglChoosePixelFormatARB(device_context_, pixel_attribs, nullptr,
                                                 1, &pix_format_id, &format_count);
 
     if (!status || format_count == 0) {
